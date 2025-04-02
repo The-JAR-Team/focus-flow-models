@@ -11,13 +11,14 @@ FOLDER_ID = os.getenv('FOLDER_ID')
 
 def list_files(folder_id, api_key):
     """
-    Lists all files in the specified Google Drive folder using the API key.
+    Lists all items (files and subfolders) in the specified Google Drive folder.
+    Returns items with their id, name, and mimeType.
     """
     url = "https://www.googleapis.com/drive/v3/files"
     params = {
         'q': f"'{folder_id}' in parents and trashed=false",
         'key': api_key,
-        'fields': 'files(id, name)'
+        'fields': 'files(id, name, mimeType)'
     }
     response = requests.get(url, params=params)
     if response.status_code == 200:
@@ -41,25 +42,36 @@ def download_file(file_id, destination):
         print("Error downloading file:", response.text)
 
 
-def download_folder(folder_id, api_key, path):
+def gather_download_tasks(folder_id, api_key, download_path):
     """
-    Downloads all files from the specified folder into the given directory.
-    Skips files that already exist.
+    Recursively scans the Google Drive folder and gathers tasks for files to download.
+    Returns a list of tuples: (file_id, destination, file_name).
+    Creates local subdirectories as needed.
     """
-    files = list_files(folder_id, api_key)
+    tasks = []
+    items = list_files(folder_id, api_key)
 
-    if not os.path.exists(path):
-        os.makedirs(path)
+    # Ensure the download path exists.
+    if not os.path.exists(download_path):
+        os.makedirs(download_path)
 
-    for file in files:
-        file_id = file['id']
-        file_name = file['name']
-        destination = os.path.join(path, file_name)
+    for item in items:
+        item_id = item['id']
+        item_name = item['name']
+        item_mime = item.get('mimeType', '')
+        destination = os.path.join(download_path, item_name)
 
-        if os.path.exists(destination):
-            print(f"Skipping {file_name}: already exists.")
+        if item_mime == 'application/vnd.google-apps.folder':
+            # If the item is a folder, recursively gather tasks.
+            print(f"Scanning folder: {item_name}")
+            tasks.extend(gather_download_tasks(item_id, api_key, destination))
         else:
-            download_file(file_id, destination)
+            # Only add file task if file does not exist locally.
+            if not os.path.exists(destination):
+                tasks.append((item_id, destination, item_name))
+            else:
+                print(f"Skipping {item_name}: already exists.")
+    return tasks
 
 
 def get_download_location():
@@ -71,6 +83,31 @@ def get_download_location():
     return user_input if user_input else "./Data"
 
 
+def download_all_files(tasks):
+    """
+    Downloads each file from the tasks list and prints progress updates.
+    """
+    total_tasks = len(tasks)
+    if total_tasks == 0:
+        print("No new files to download.")
+        return
+
+    print(f"Starting download of {total_tasks} file(s).")
+    downloaded_count = 0
+
+    for idx, (file_id, destination, file_name) in enumerate(tasks, start=1):
+        download_file(file_id, destination)
+        downloaded_count += 1
+        percentage = (downloaded_count / total_tasks) * 100
+        print(f"Progress: {downloaded_count}/{total_tasks} files downloaded ({percentage:.1f}%).\n")
+
+
 if __name__ == '__main__':
-    download_path = './dataset'
-    download_folder(FOLDER_ID, API_KEY, download_path)
+    # Get the local destination folder from the user.
+    download_location = './dataset'
+
+    # Gather all tasks for files to download (including subfolders).
+    tasks = gather_download_tasks(FOLDER_ID, API_KEY, download_location)
+
+    # Download all files while printing process updates.
+    download_all_files(tasks)
