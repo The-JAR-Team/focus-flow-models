@@ -39,6 +39,7 @@ class SimplePipeline:
         tensor_stacking_stage = TensorStackingStage(target_frames=240, num_landmarks=478, dims=3)
         tesnor_saving_stage = TensorSavingStage(pipeline_version=pipeline_version,
                                                 cache_root=self.cache_root)
+
         # For each dataset, TensorSavingStage will be instantiated with that dataset type.
         # Create an inner pipeline that runs the four stages in sequence.
         self.inner_pipeline = OrchestrationPipeline(
