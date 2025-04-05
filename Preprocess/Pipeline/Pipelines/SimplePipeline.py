@@ -65,8 +65,7 @@ class SimplePipeline:
         print(f"Processing {total_rows} rows for {dataset_type} dataset...")
 
         # Instantiate a TensorSavingStage for this dataset.
-        save_stage = TensorSavingStage(dataset_type=dataset_type,
-                                       pipeline_version=self.pipeline_version,
+        save_stage = TensorSavingStage(pipeline_version=self.pipeline_version,
                                        cache_root=self.cache_root)
 
         cumulative_time = 0.0
