@@ -49,6 +49,7 @@ class SimplePipeline:
         Process all rows for the given dataset type (e.g., 'Train') and save tensor results to cache.
         Prints progress every 10 rows, including percentage complete and timing statistics.
         Every 100 rows, runs the inner pipeline with verbose=True.
+        Before processing a row, checks if its corresponding cache file already exists.
         """
         # Load the appropriate CSV from SourceStage.
         source_data = self.source_stage.process(verbose=False)
@@ -67,32 +68,39 @@ class SimplePipeline:
         # Instantiate a TensorSavingStage for this dataset.
         save_stage = TensorSavingStage(pipeline_version=self.pipeline_version,
                                        cache_root=self.cache_root)
-
-        cumulative_time = 0.0
-        last_10_time = 0.0
+        counter = 0.0
+        print_idx = 10
+        import time  # Ideally, import at the top.
         for idx, row in df.iterrows():
+            # Compute expected cache file path based on the row's clip_folder.
+            clip_folder = str(row['clip_folder'])
+            subfolder = clip_folder[:6]
+            cache_file = os.path.join(self.cache_root, "PipelineResult", self.pipeline_version, subfolder,
+                                      f"{clip_folder}_{self.pipeline_version}.pt")
+            # If the cache file exists, skip processing this row.
+            if os.path.exists(cache_file):
+                print(f"Row {idx + 1}: Already processed for clip {clip_folder}. Skipping.")
+                continue
+
             start_time = time.time()
             # Use verbose=True every 100 rows.
             if (idx + 1) % 100 == 0:
-                # Run inner pipeline, then pass result to saving stage.
                 result = self.inner_pipeline.run(data=row, verbose=True)
             else:
                 result = self.inner_pipeline.run(data=row, verbose=False)
-            # Now, call the saving stage on the result.
-            # The saving stage now uses the clip_folder from the result.
+            # Now, save the result (TensorSavingStage will use clip_folder from the result).
             save_stage.process(result, verbose=False)
             end_time = time.time()
             row_time = end_time - start_time
-            cumulative_time += row_time
-            last_10_time += row_time
+            counter += row_time
 
             # Print progress every 10 rows or on the final row.
-            if (idx + 1) % 10 == 0 or (idx + 1) == total_rows:
-                avg_time = cumulative_time / (idx + 1)
+            if (idx + 1) % print_idx == 0 or (idx + 1) == total_rows:
+                avg_time = counter / print_idx
                 percentage = 100.0 * (idx + 1) / total_rows
                 print(f"Processed {idx + 1}/{total_rows} rows ({percentage:.2f}%). "
-                      f"Avg time per row: {avg_time:.2f}s. Last 10 rows took: {last_10_time:.2f}s.")
-                last_10_time = 0.0
+                      f"Avg time per row: {avg_time:.2f}s. Last 10 rows took: {counter:.2f}s.")
+                counter = 0.0
 
     def create_dataloader(self, dataset_type: str, batch_size: int = 32) -> DataLoader:
         """
