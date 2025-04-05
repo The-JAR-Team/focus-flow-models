@@ -2,7 +2,7 @@
 .env
 
 # Custom directories / files to ignore
-./Preprocess/Pipeline/DaiseeConfig.py
+Preprocess/Pipeline/DaiseeConfig.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
