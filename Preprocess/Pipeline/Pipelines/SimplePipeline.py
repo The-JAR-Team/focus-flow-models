@@ -37,10 +37,12 @@ class SimplePipeline:
         )
         mediapipe_stage = MediapipeProcessingStage()
         tensor_stacking_stage = TensorStackingStage(target_frames=240, num_landmarks=478, dims=3)
+        tesnor_saving_stage = TensorSavingStage(pipeline_version=pipeline_version,
+                                                cache_root=self.cache_root)
         # For each dataset, TensorSavingStage will be instantiated with that dataset type.
         # Create an inner pipeline that runs the four stages in sequence.
         self.inner_pipeline = OrchestrationPipeline(
-            stages=[frame_extraction_stage, mediapipe_stage, tensor_stacking_stage]
+            stages=[frame_extraction_stage, mediapipe_stage, tensor_stacking_stage, tesnor_saving_stage]
         )
         # Note: We'll call TensorSavingStage separately within process_dataset.
 
@@ -65,9 +67,6 @@ class SimplePipeline:
         total_rows = len(df)
         print(f"Processing {total_rows} rows for {dataset_type} dataset...")
 
-        # Instantiate a TensorSavingStage for this dataset.
-        save_stage = TensorSavingStage(pipeline_version=self.pipeline_version,
-                                       cache_root=self.cache_root)
         counter = 0.0
         print_idx = 10
         import time  # Ideally, import at the top.
@@ -75,7 +74,7 @@ class SimplePipeline:
             # Compute expected cache file path based on the row's clip_folder.
             clip_folder = str(row['clip_folder'])
             subfolder = clip_folder[:6]
-            cache_file = os.path.join(self.cache_root, "PipelineResult", self.pipeline_version, subfolder,
+            cache_file = os.path.join(self.cache_root, "PipelineResult", self.pipeline_version, dataset_type, subfolder,
                                       f"{clip_folder}_{self.pipeline_version}.pt")
             # If the cache file exists, skip processing this row.
             if os.path.exists(cache_file):
@@ -85,11 +84,10 @@ class SimplePipeline:
             start_time = time.time()
             # Use verbose=True every 100 rows.
             if (idx + 1) % 100 == 0:
-                result = self.inner_pipeline.run(data=row, verbose=True)
+                self.inner_pipeline.run(data=row, verbose=True)
             else:
-                result = self.inner_pipeline.run(data=row, verbose=False)
+                self.inner_pipeline.run(data=row, verbose=False)
             # Now, save the result (TensorSavingStage will use clip_folder from the result).
-            save_stage.process(result, verbose=False)
             end_time = time.time()
             row_time = end_time - start_time
             counter += row_time
