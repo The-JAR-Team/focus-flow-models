@@ -32,11 +32,11 @@ class SimplePipeline:
         frame_extraction_stage = FrameExtractionStage(
             pipeline_version=pipeline_version,
             save_frames=False,  # Set to True if you want to save frames to disk.
-            desired_fps=24.0,
+            desired_fps=10.0,
             jpeg_quality=50
         )
         mediapipe_stage = MediapipeProcessingStage()
-        tensor_stacking_stage = TensorStackingStage(target_frames=240, num_landmarks=478, dims=3)
+        tensor_stacking_stage = TensorStackingStage(target_frames=100, num_landmarks=478, dims=3)
         # For each dataset, TensorSavingStage will be instantiated with that dataset type.
         # Create an inner pipeline that runs the four stages in sequence.
         self.inner_pipeline = OrchestrationPipeline(
