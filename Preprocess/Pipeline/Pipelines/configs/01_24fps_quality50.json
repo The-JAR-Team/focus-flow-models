@@ -1,0 +1,33 @@
+{
+  "config_name": "24fps_quality50",
+  "pipeline_version": "01",
+  "stages": [
+    {
+      "name": "FrameExtractionStage",
+      "params": {
+        "save_frames": false,
+        "desired_fps": 24.0,
+        "jpeg_quality": 50,
+        "resize_width": null,
+        "resize_height": null
+      }
+    },
+    {
+      "name": "MediapipeProcessingStage",
+      "params": {}
+    },
+    {
+      "name": "TensorStackingStage",
+      "params": {
+        "target_frames": 240,
+        "num_landmarks": 478,
+        "dims": 3
+      }
+    },
+    {
+      "name": "TensorSavingStage",
+      "params": {}
+    }
+  ],
+  "dataset_types": ["Train", "Validation", "Test"]
+}
