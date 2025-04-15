@@ -1,247 +1,285 @@
+# In ConfigurablePipeline.py (or your main pipeline runner file)
+
 import os
 import json
 import importlib
 import time
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
+import inspect
+import logging # Keep logging config attempt
+
+# --- Attempt to Suppress TensorFlow/absl Warnings ---
+# Set environment variable (also recommended in the stage file itself)
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Keep if desired, but might not be needed now
+# Configure Python logging for TensorFlow
+try:
+    logging.getLogger('tensorflow').setLevel(logging.ERROR)
+except Exception as e: print(f"Could not configure TensorFlow logging: {e}")
+# Configure absl logging
+try:
+    import absl.logging
+    logging.root.removeHandler(absl.logging._absl_handler)
+    absl.logging._warn_preinit_stderr = False
+except Exception as e: pass # Ignore if absl not found/fails
+# --------------------------------------------------
+
+import pandas as pd
+# import torch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
+# --- Use Threading instead of Multiprocessing ---
+from concurrent.futures import ThreadPoolExecutor, as_completed
+# Removed multiprocessing import
 
-# Import your configuration constants
-from Preprocess.Pipeline.DaiseeConfig import CACHE_DIR
+# --- Project Imports ---
+try:
+    from Preprocess.Pipeline import config as project_config
+except ImportError:
+    project_config = None
+
 from Preprocess.Pipeline.Encapsulation.CachedTensorDataset import CachedTensorDataset
-# Import the orchestration pipeline
 from Preprocess.Pipeline.OrchestrationPipeline import OrchestrationPipeline
-# Import source stage
 from Preprocess.Pipeline.Stages.SourceStage import SourceStage
+# Stage classes will be imported dynamically
 
+
+# ----- Worker Function (simplified for threading) -----
+
+def _process_single_row_thread_worker(row_dict: Dict, pipeline_instance: 'ConfigurablePipeline') -> Dict:
+    """
+    Worker function executed by each thread. Processes a single row.
+    Accesses the main pipeline instance directly (safe with threads).
+    """
+    status = 'error'; error_msg = None
+    clip_folder = str(row_dict.get('clip_folder', 'UnknownClip'))
+    dataset_type = row_dict['dataset_type'] # Injected by process_dataset
+
+    try:
+        # Calculate Cache Path using the pipeline instance's method
+        cache_file = pipeline_instance._get_expected_cache_path(row_dict, dataset_type)
+
+        if os.path.exists(cache_file):
+            return {'status': 'skipped', 'clip': clip_folder}
+
+        # Run Pipeline using the shared inner_pipeline instance
+        # Ensure inner_pipeline and its stages are thread-safe if they modify shared state
+        # (Our current stages seem mostly self-contained per row)
+        _ = pipeline_instance.inner_pipeline.run(data=row_dict, verbose=False) # Keep threads quiet
+        status = 'processed'
+    except Exception as e:
+        import traceback
+        error_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+        status = 'error'
+
+    return {'status': status, 'clip': clip_folder, 'error': error_msg}
+
+
+# ----- Updated ConfigurablePipeline Class -----
 
 class ConfigurablePipeline:
-    """
-    A configurable pipeline that can be initialized from a JSON configuration file.
-    The pipeline orchestrates the entire preprocessing flow:
-      1. Run the SourceStage to obtain CSVs.
-      2. For each dataset (Train, Validation, Test), for each row:
-           a. Check if a cached tensor result exists in the proper cache directory.
-           b. If not, run the inner pipeline with dynamically loaded stages to generate and save a fixed-size tensor stack.
-      3. Create DataLoaders for each dataset from the cache.
-    """
+    """ Runs a preprocessing pipeline configured via JSON, using threading for row processing. """
+
+    STAGE_COMMON_PARAMS = {
+        "FrameExtractionStage": ["pipeline_version", "dataset_root", "cache_dir"],
+        "TensorSavingStage": ["pipeline_version", "cache_dir", "config_name"],
+    }
 
     def __init__(self, config_path: str = None, config_dict: Dict = None):
-        """
-        Initialize the configurable pipeline from either a JSON file path or a dictionary.
+        """ Initialize pipeline from JSON config (path or dict). """
+        if config_path:
+            with open(config_path, 'r') as f: self.config = json.load(f)
+            self.config.setdefault('config_name', os.path.splitext(os.path.basename(config_path))[0])
+        elif config_dict:
+            self.config = config_dict; self.config.setdefault('config_name', 'dict_config')
+        else: raise ValueError("Need config_path or config_dict")
 
-        Args:
-            config_path: Path to the JSON configuration file
-            config_dict: Dictionary containing the configuration
+        self.config_name = self.config['config_name']
+        self.pipeline_version = self.config.get('pipeline_version', 'unversioned')
+        self.dataset_name = self.config['dataset_name']
+        self.metadata_path = self.config['metadata_csv_path']
 
-        Note:
-            pipeline_version: Used to track compatibility between different versions of pipeline code
-            config_name: Used to identify different preprocessing configurations/settings
-        """
-        if config_path is not None:
-            # Load configuration from JSON file
-            with open(config_path, 'r') as f:
-                self.config = json.load(f)
-                # Extract config name from file path if not defined in config
-                if 'config_name' not in self.config:
-                    self.config['config_name'] = os.path.basename(config_path).split('.')[0]
-        elif config_dict is not None:
-            # Use provided configuration dictionary
-            self.config = config_dict
-            # Ensure config_name exists
-            if 'config_name' not in self.config:
-                self.config['config_name'] = 'default_config'
-        else:
-            raise ValueError("Either config_path or config_dict must be provided")
+        self.cache_root = self.config.get('cache_dir') or getattr(project_config, 'CACHE_DIR', None)
+        if not self.cache_root: raise ValueError("cache_dir missing")
 
-        # Extract configuration parameters
-        self.pipeline_version = self.config.get('pipeline_version', '01')
-        self.config_name = self.config.get('config_name')
-        self.cache_root = CACHE_DIR
-        self.dataset_types = self.config.get('dataset_types', ['Train', 'Validation', 'Test'])
+        self.dataset_root = self.config.get('dataset_root')
+        if not self.dataset_root:
+            root_attr = f"{self.dataset_name.upper()}_DATASET_ROOT"
+            self.dataset_root = getattr(project_config, root_attr, None)
+            if not self.dataset_root: raise ValueError(f"dataset_root missing and {root_attr} not in config.py")
 
-        # Initialize the source stage
-        self.source_stage = SourceStage(self.pipeline_version)
+        source_stage_cfg = self.config.get('source_stage_config', {})
+        self.source_stage = SourceStage(
+            pipeline_version=self.pipeline_version, cache_dir=self.cache_root,
+            metadata_csv_path=self.metadata_path, **source_stage_cfg
+        )
 
-        # Build the inner pipeline with dynamic stage loading
-        self.inner_pipeline = self._build_inner_pipeline()
+        # Build Inner Pipeline instance directly, will be shared by threads
+        print("Building inner pipeline...")
+        self.inner_pipeline = self._build_inner_pipeline(self.config.get('stages', []))
+        print(f"Inner pipeline stages: {[s.__class__.__name__ for s in self.inner_pipeline.stages]}")
 
-    def _build_inner_pipeline(self) -> OrchestrationPipeline:
-        """
-        Dynamically build the inner pipeline based on the configuration.
+        self.data_loader_params = self.config.get('data_loader_params', {})
+        self.dataset_types_to_process = self.config.get('dataset_types_to_process', ['Train', 'Validation', 'Test'])
 
-        Returns:
-            An OrchestrationPipeline instance with the configured stages
-        """
+        print(f"Initialized Pipeline: '{self.config_name}' / v{self.pipeline_version} for '{self.dataset_name}'")
+
+    def _build_inner_pipeline(self, stage_configs: List[Dict]) -> OrchestrationPipeline:
+        """ Dynamically build the inner pipeline from configuration list. """
         stages = []
-        stage_configs = self.config.get('stages', [])
-
         for stage_config in stage_configs:
-            stage_name = stage_config.get('name')
+            stage_name = stage_config['name']
             params = stage_config.get('params', {})
+            # print(f"  Loading stage: {stage_name}") # Less verbose
 
-            # Add pipeline_version to params if the stage might need it
-            if stage_name in ['FrameExtractionStage', 'TensorSavingStage']:
-                params['pipeline_version'] = self.pipeline_version
+            common_needed = self.STAGE_COMMON_PARAMS.get(stage_name, [])
+            if "pipeline_version" in common_needed: params['pipeline_version'] = self.pipeline_version
+            if "dataset_root" in common_needed: params['dataset_root'] = self.dataset_root
+            if "cache_dir" in common_needed: params['cache_dir'] = self.cache_root
+            if "config_name" in common_needed: params['config_name'] = self.config_name
 
-            # Add config_name and cache_root to TensorSavingStage
-            if stage_name == 'TensorSavingStage':
-                params['cache_root'] = self.cache_root
-                params['config_name'] = self.config_name
-
-            # Dynamically import and instantiate the stage class
             try:
-                # Import directly from the Stages package - this matches your folder structure
                 module_path = f"Preprocess.Pipeline.Stages.{stage_name}"
-                print(f"Attempting to import {stage_name} from {module_path}")
-
-                # Direct imports for each stage type
-                if stage_name == "FrameExtractionStage":
-                    from Preprocess.Pipeline.Stages.FrameExtractionStage import FrameExtractionStage
-                    stage_instance = FrameExtractionStage(**params)
-                elif stage_name == "MediapipeProcessingStage":
-                    from Preprocess.Pipeline.Stages.MediapipeProcessingStage import MediapipeProcessingStage
-                    stage_instance = MediapipeProcessingStage(**params)
-                elif stage_name == "SourceStage":
-                    from Preprocess.Pipeline.Stages.SourceStage import SourceStage
-                    stage_instance = SourceStage(**params)
-                elif stage_name == "TensorSavingStage":
-                    from Preprocess.Pipeline.Stages.TensorSavingStage import TensorSavingStage
-                    stage_instance = TensorSavingStage(**params)
-                elif stage_name == "TensorStackingStage":
-                    from Preprocess.Pipeline.Stages.TensorStackingStage import TensorStackingStage
-                    stage_instance = TensorStackingStage(**params)
-                else:
-                    # Fallback to dynamic import for any other stages
-                    try:
-                        module = importlib.import_module(module_path)
-                        stage_class = getattr(module, stage_name)
-                        stage_instance = stage_class(**params)
-                    except (ImportError, AttributeError) as e:
-                        print(f"Dynamic import failed: {e}")
-                        raise
-
+                module = importlib.import_module(module_path)
+                stage_class = getattr(module, stage_name)
+                stage_instance = stage_class(**params)
                 stages.append(stage_instance)
             except Exception as e:
-                print(f"Error loading stage {stage_name}: {e}")
-                print(f"Params passed to {stage_name}: {params}")
-                raise ValueError(f"Failed to load stage {stage_name}: {e}")
+                 print(f"\n!!! Error loading/instantiating stage '{stage_name}' !!!")
+                 print(f"Module Path: {module_path}, Params Passed: {params}")
+                 raise e
 
+        if not stages: print("Warning: No stages defined for inner pipeline.")
         return OrchestrationPipeline(stages=stages)
 
-    def process_dataset(self, dataset_type: str) -> None:
-        """
-        Process all rows for the given dataset type and save tensor results to cache.
-        Prints progress every 10 rows, including percentage complete and timing statistics.
+    def _get_expected_cache_path(self, row_data: dict, dataset_type: str) -> str:
+        """ Calculate final tensor cache path. MUST match TensorSavingStage logic. """
+        clip_folder = str(row_data['clip_folder'])
+        person_id = str(row_data.get('person', 'UnknownPerson'))
+        subfolder = person_id
+        filename = f"{clip_folder}_{self.pipeline_version}.pt"
+        return os.path.join(self.cache_root,"PipelineResult", self.config_name, self.pipeline_version, dataset_type, subfolder, filename)
 
-        Args:
-            dataset_type: The type of dataset to process ('Train', 'Validation', or 'Test')
-        """
-        # Load the appropriate CSV from SourceStage
+    def process_dataset(self, dataset_type: str, max_workers: Optional[int] = None) -> None:
+        """ Process all rows for a dataset type using ThreadPoolExecutor. """
+        print(f"\n--- Processing dataset: {dataset_type} ---")
         source_data = self.source_stage.process(verbose=False)
-        if dataset_type.lower() == 'train':
-            df = source_data.get_train_data()
-        elif dataset_type.lower() == 'validation':
-            df = source_data.get_validation_data()
-        elif dataset_type.lower() == 'test':
-            df = source_data.get_test_data()
-        else:
-            raise ValueError(f"dataset_type must be one of {self.dataset_types}")
+
+        df = None
+        try: # Load appropriate split dataframe
+            if dataset_type.lower() == 'train': df = source_data.get_train_data()
+            elif dataset_type.lower() in ['validation', 'val']: df = source_data.get_validation_data()
+            elif dataset_type.lower() == 'test': df = source_data.get_test_data()
+            else: raise ValueError(f"Invalid dataset_type: {dataset_type}")
+        except FileNotFoundError as e: print(f"Warning: Split CSV not found for {dataset_type}: {e}. Skipping."); return
+        except Exception as e: print(f"Error loading split CSV for {dataset_type}: {e}. Skipping."); return
+
+        if df is None or df.empty: print(f"Warning: No data loaded for '{dataset_type}'. Skipping."); return
 
         total_rows = len(df)
-        print(f"Processing {total_rows} rows for {dataset_type} dataset...")
+        # Determine number of workers for threads (can often be higher than CPU count for I/O)
+        # Default to a reasonable number like cpu_count * 2 or a fixed number like 16
+        num_workers = max(1, max_workers or (os.cpu_count() * 2 if os.cpu_count() else 4))
+        num_workers = min(num_workers, total_rows) # Don't need more threads than rows
 
-        counter = 0.0
-        print_idx = 10
+        print(f"Processing {total_rows} rows for {dataset_type} using up to {num_workers} threads...")
+        processed, skipped, errors = 0, 0, 0
 
-        for idx, row in df.iterrows():
-            # Compute expected cache file path based on the row's clip_folder
-            clip_folder = str(row['clip_folder'])
-            subfolder = clip_folder[:6]
-            cache_file = os.path.join(self.cache_root, "PipelineResult", self.config_name, self.pipeline_version,
-                                      dataset_type, subfolder, f"{clip_folder}_{self.pipeline_version}.pt")
+        futures = []
+        # Use ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            # Submit all tasks
+            for _, row in df.iterrows():
+                row_dict = row.to_dict()
+                row_dict['dataset_type'] = dataset_type
+                # Pass the pipeline instance 'self' to the worker thread
+                future = executor.submit(_process_single_row_thread_worker, row_dict, self)
+                futures.append(future)
 
-            # If the cache file exists, skip processing this row
-            if os.path.exists(cache_file):
-                print(f"Row {idx + 1}: Already processed for clip {clip_folder}. Skipping.")
-                continue
+            # Process results as they complete with tqdm progress bar
+            progress_bar = tqdm(as_completed(futures), total=len(futures), desc=f"Processing {dataset_type}", unit="row")
+            for future in progress_bar:
+                try:
+                    result = future.result() # Get result from thread
+                    status = result.get('status', 'error')
+                    if status == 'processed': processed += 1
+                    elif status == 'skipped': skipped += 1
+                    elif status == 'error':
+                        errors += 1; clip = result.get('clip', 'N/A'); error_msg = result.get('error', 'Unknown error')
+                        tqdm.write(f"\n! Thread Error (clip: {clip}) ! Error: {error_msg[:500]}...")
+                except Exception as e: # Catch errors from future.result() itself
+                    errors += 1; tqdm.write(f"\n! Critical error fetching result from thread ! Error: {e}")
 
-            start_time = time.time()
-            # Use verbose=True every 100 rows
-            verbose = (idx + 1) % 100 == 0
-            self.inner_pipeline.run(data=row, verbose=verbose)
+                # Update tqdm postfix display
+                if (processed + skipped + errors) % 10 == 0 or errors > 0:
+                     progress_bar.set_postfix(Processed=processed, Skipped=skipped, Errors=errors, refresh=False)
 
-            end_time = time.time()
-            row_time = end_time - start_time
-            counter += row_time
+            progress_bar.set_postfix(Processed=processed, Skipped=skipped, Errors=errors, refresh=True)
 
-            # Print progress every 10 rows or on the final row
-            if (idx + 1) % print_idx == 0 or (idx + 1) == total_rows:
-                avg_time = counter / min(print_idx, idx % print_idx + 1 if idx % print_idx != 0 else print_idx)
-                percentage = 100.0 * (idx + 1) / total_rows
-                print(f"Processed {idx + 1}/{total_rows} rows ({percentage:.2f}%). "
-                      f"Avg time per row: {avg_time:.2f}s. Last batch took: {counter:.2f}s.")
-                counter = 0.0
-
-    def create_dataloader(self, dataset_type: str, batch_size: int = 32) -> DataLoader:
-        """
-        Creates a DataLoader for the given dataset type by recursively loading the cached tensor results.
-
-        Args:
-            dataset_type: The type of dataset to create a DataLoader for
-            batch_size: The batch size for the DataLoader
-
-        Returns:
-            A DataLoader instance for the specified dataset
-        """
-        # The root directory for cached tensor results for this dataset
-        cache_dir = os.path.join(self.cache_root, "PipelineResult", self.config_name, self.pipeline_version,
-                                 dataset_type)
-        dataset = CachedTensorDataset(cache_dir)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=(dataset_type.lower() == 'train'))
-        return dataloader
-
-    def run(self) -> Tuple[DataLoader, DataLoader, DataLoader]:
-        """
-        Run the pipeline for all configured dataset types and create DataLoaders.
-
-        Returns:
-            A tuple of DataLoaders for train, validation, and test datasets
-        """
-        # Process each dataset type
-        for ds in self.dataset_types:
-            self.process_dataset(ds)
-
-        # Create DataLoaders
-        loaders = {}
-        for ds in self.dataset_types:
-            loaders[ds.lower()] = self.create_dataloader(ds)
-
-        return (loaders.get('train'), loaders.get('validation'), loaders.get('test'))
+        print(f"--- Finished {dataset_type}: Processed={processed}, Skipped={skipped}, Errors={errors} ---")
 
 
-def load_pipeline_from_json(config_path: str) -> ConfigurablePipeline:
-    """
-    Helper function to create a pipeline from a JSON configuration file.
+    def create_dataloader(self, dataset_type: str) -> Optional[DataLoader]:
+        """ Create DataLoader from cached results for a dataset type. """
+        print(f"\n--- Creating DataLoader for: {dataset_type} ---")
+        dl_params = self.data_loader_params
+        batch_size = dl_params.get('batch_size', 32)
+        num_workers = dl_params.get('num_workers', 0)
+        pin_memory = dl_params.get('pin_memory', True) if num_workers > 0 else False
 
-    Args:
-        config_path: Path to the JSON configuration file
+        cache_results_dir = os.path.join(self.cache_root,"PipelineResult", self.config_name, self.pipeline_version, dataset_type)
 
-    Returns:
-        A ConfigurablePipeline instance
-    """
-    return ConfigurablePipeline(config_path=config_path)
+        if not os.path.isdir(cache_results_dir):
+             print(f"Warning: Results cache dir not found: {cache_results_dir}.")
+             return None
+        try:
+            dataset = CachedTensorDataset(cache_results_dir)
+            print(f"Found {len(dataset)} samples in {cache_results_dir} (recursive search).")
+            if len(dataset) == 0: return None
+            should_shuffle = (dataset_type.lower() == 'train')
+            return DataLoader(dataset, batch_size=batch_size, shuffle=should_shuffle,
+                              num_workers=num_workers, pin_memory=pin_memory)
+        except Exception as e:
+            print(f"Error creating DataLoader for {dataset_type} from {cache_results_dir}: {e}")
+            return None
+
+    def run(self, max_workers: Optional[int] = None) -> Tuple[Optional[DataLoader], Optional[DataLoader], Optional[DataLoader]]:
+        """ Run pipeline for configured datasets and return DataLoaders. """
+        print(f"\n=== Starting Pipeline Run: '{self.config_name}' / v{self.pipeline_version} ===")
+        run_start_time = time.time()
+        for ds in self.dataset_types_to_process:
+            # Pass max_workers for threading pool size
+            self.process_dataset(ds, max_workers=max_workers)
+
+        loaders = {ds_type.lower(): self.create_dataloader(ds_type) for ds_type in self.dataset_types_to_process}
+
+        print(f"\n=== Pipeline Run Finished ({self.config_name} / v{self.pipeline_version}) | Total time: {(time.time() - run_start_time):.2f}s ===")
+        return (loaders.get('train'), loaders.get('validation') or loaders.get('val'), loaders.get('test'))
 
 
 # ----- Example Usage -----
 if __name__ == "__main__":
-    # Example 1: Load from a JSON file
-    config_path = "configs/01_24fps_quality50.json"
-    pipeline = load_pipeline_from_json(config_path)
-    train_loader, val_loader, test_loader = pipeline.run()
+    # Removed multiprocessing.freeze_support()
 
-    # Demonstrate DataLoader content for the Train dataset
-    print("Final DataLoader for Train dataset. Sample contents:")
-    for tensor_stack, label in train_loader:
-        print("Tensor stack shape:", tensor_stack.shape)
-        print("Label:", label)
-        break
+    config_file_path = "./configs/ENGAGENET_10fps_quality95_randdist.json"
+    if not os.path.exists(config_file_path):
+        print(f"Error: Configuration file not found at '{config_file_path}'")
+        # ... (print example structure) ...
+        exit()
+
+    print(f"\n--- Loading Config and Running Pipeline from: {config_file_path} ---")
+    try:
+        pipeline = ConfigurablePipeline(config_path=config_file_path)
+
+        num_threads_to_use = 4
+        # Or set a fixed number:
+        # num_threads_to_use = 16
+        print(f"Attempting to use max_workers = {num_threads_to_use} (threads)")
+        train_loader, val_loader, test_loader = pipeline.run(max_workers=num_threads_to_use) # Pass thread limit
+
+        if train_loader: print(f"\nTrain DataLoader created with {len(train_loader)} batches.")
+        if val_loader: print(f"Validation DataLoader created with {len(val_loader)} batches.")
+        if test_loader: print(f"Test DataLoader created with {len(test_loader)} batches.")
+
+    except Exception as e:
+         print(f"\n!!! Pipeline execution failed: {e} !!!")
+         import traceback; traceback.print_exc()

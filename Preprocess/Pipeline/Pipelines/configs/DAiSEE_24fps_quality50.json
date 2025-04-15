@@ -1,6 +1,13 @@
 {
-  "config_name": "24fps_quality50",
+  "config_name": "DAiSEE_24fps_quality50",
   "pipeline_version": "01",
+  "dataset_name": "DAiSEE",
+  "metadata_csv_path": "../Metadata/daisee_metadata.csv",
+  "cache_dir": null,
+  "dataset_root": null,
+  "source_stage_config": {
+    "perform_random_split": false
+  },
   "stages": [
     {
       "name": "FrameExtractionStage",
@@ -29,5 +36,13 @@
       "params": {}
     }
   ],
-  "dataset_types": ["Train", "Validation", "Test"]
+  "data_loader_params": {
+    "batch_size": 32,
+    "num_workers": 0
+  },
+  "dataset_types_to_process": [
+    "Train",
+    "Validation",
+    "Test"
+  ]
 }

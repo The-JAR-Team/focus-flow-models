@@ -64,4 +64,5 @@ class TensorStackingStage(PipelineStage):
         return TensorStackingResult(tensor_stack=tensor_stack,
                                     label=landmark_extraction_result.label,
                                     clip_folder=landmark_extraction_result.clip_folder,
-                                    dataset_type=landmark_extraction_result.dataset_type)
+                                    dataset_type=landmark_extraction_result.dataset_type,
+                                    subject_name=landmark_extraction_result.subject_name)

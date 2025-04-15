@@ -9,8 +9,9 @@ class TensorStackingResult:
       clip_folder (str): The clip folder identifier.
     """
 
-    def __init__(self, tensor_stack, label, clip_folder, dataset_type=None):
+    def __init__(self, tensor_stack, label, clip_folder, subject_name=None, dataset_type=None):
         self.tensor_stack = tensor_stack
         self.label = label
         self.clip_folder = clip_folder
         self.dataset_type = dataset_type
+        self.subject_name = subject_name

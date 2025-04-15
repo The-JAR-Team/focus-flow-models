@@ -8,9 +8,10 @@ class ExtractionResult:
       label (dict or None): Dictionary containing label information.
       clip_folder (str or None): The clip folder identifier.
     """
-    def __init__(self, frames, frames_dir=None, label=None, clip_folder=None, dataset_type=None):
+    def __init__(self, frames, frames_dir=None, label=None, clip_folder=None, subject_name=None, dataset_type=None):
         self.frames = frames
         self.dataset_type = dataset_type
         self.frames_dir = frames_dir
         self.label = label
         self.clip_folder = clip_folder
+        self.subject_name = subject_name

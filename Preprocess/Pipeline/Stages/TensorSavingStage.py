@@ -16,15 +16,15 @@ class TensorSavingStage(PipelineStage):
         config_name: Used to identify different preprocessing configurations/settings
     """
 
-    def __init__(self, pipeline_version: str, cache_root: str, config_name: str):
+    def __init__(self, pipeline_version: str, cache_dir: str, config_name: str):
         """
         Parameters:
           pipeline_version: str (e.g., "01") - Used to track code version compatibility
-          cache_root: str, root directory for cached pipeline results.
+          cache_dir: str, root directory for cached pipeline results.
           config_name: str, name of the configuration being used for preprocessing settings.
         """
         self.pipeline_version = pipeline_version
-        self.cache_root = cache_root
+        self.cache_root = cache_dir
         self.config_name = config_name
 
     def process(self, tensor_stacking_result: TensorStackingResult, verbose=True):
@@ -41,7 +41,7 @@ class TensorSavingStage(PipelineStage):
         clip_folder = tensor_stacking_result.clip_folder
         dataset_type = tensor_stacking_result.dataset_type  # Must be set upstream.
         # Use the first 6 characters of clip_folder to create a subdirectory.
-        subfolder = clip_folder[:6]
+        subfolder = tensor_stacking_result.subject_name
 
         # Build the save directory:
         # {cache_root}/PipelineResult/{config_name}/{pipeline_version}/{dataset_type}/{subfolder}/

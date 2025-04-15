@@ -1,14 +1,20 @@
 {
   "config_name": "10fps_quality95",
-  "pipeline_version": "02",
-  "cache_root": null,
+  "pipeline_version": "01",
+  "dataset_name": "DAiSEE",
+  "metadata_csv_path": "../Metadata/daisee_metadata.csv",
+  "cache_dir": null,
+  "dataset_root": null,
+  "source_stage_config": {
+    "perform_random_split": false
+  },
   "stages": [
     {
       "name": "FrameExtractionStage",
       "params": {
         "save_frames": false,
-        "desired_fps": 10.0,
-        "jpeg_quality": 95,
+        "desired_fps": 24.0,
+        "jpeg_quality": 50,
         "resize_width": null,
         "resize_height": null
       }
@@ -30,5 +36,13 @@
       "params": {}
     }
   ],
-  "dataset_types": ["Train", "Validation", "Test"]
+  "data_loader_params": {
+    "batch_size": 32,
+    "num_workers": 0
+  },
+  "dataset_types_to_process": [
+    "Train",
+    "Validation",
+    "Test"
+  ]
 }

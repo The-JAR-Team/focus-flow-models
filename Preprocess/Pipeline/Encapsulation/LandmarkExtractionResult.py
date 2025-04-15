@@ -10,9 +10,10 @@ class LandmarkExtractionResult:
       frames_dir (str or None): Directory where frames were saved (if applicable).
     """
 
-    def __init__(self, landmarks, label=None, frames_dir=None, clip_folder=None, dataset_type=None):
+    def __init__(self, landmarks, label=None, frames_dir=None, clip_folder=None, subject_name=None, dataset_type=None):
         self.landmarks = landmarks
         self.label = label
         self.frames_dir = frames_dir
         self.clip_folder = clip_folder
         self.dataset_type = dataset_type
+        self.subject_name = subject_name
