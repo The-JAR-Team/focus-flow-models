@@ -1,33 +1,12 @@
-# In ConfigurablePipeline.py (or your main pipeline runner file)
-
 import os
 import json
 import importlib
 import time
 from typing import Dict, List, Any, Tuple, Optional
-import inspect
-import logging # Keep logging config attempt
-
-# --- Attempt to Suppress TensorFlow/absl Warnings ---
-# Set environment variable (also recommended in the stage file itself)
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Keep if desired, but might not be needed now
-# Configure Python logging for TensorFlow
-try:
-    logging.getLogger('tensorflow').setLevel(logging.ERROR)
-except Exception as e: print(f"Could not configure TensorFlow logging: {e}")
-# Configure absl logging
-try:
-    import absl.logging
-    logging.root.removeHandler(absl.logging._absl_handler)
-    absl.logging._warn_preinit_stderr = False
-except Exception as e: pass # Ignore if absl not found/fails
-# --------------------------------------------------
-
 import pandas as pd
-# import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-# --- Use Threading instead of Multiprocessing ---
+# --- Use Threading ---
 from concurrent.futures import ThreadPoolExecutor, as_completed
 # Removed multiprocessing import
 
@@ -62,8 +41,6 @@ def _process_single_row_thread_worker(row_dict: Dict, pipeline_instance: 'Config
             return {'status': 'skipped', 'clip': clip_folder}
 
         # Run Pipeline using the shared inner_pipeline instance
-        # Ensure inner_pipeline and its stages are thread-safe if they modify shared state
-        # (Our current stages seem mostly self-contained per row)
         _ = pipeline_instance.inner_pipeline.run(data=row_dict, verbose=False) # Keep threads quiet
         status = 'processed'
     except Exception as e:
@@ -114,9 +91,9 @@ class ConfigurablePipeline:
         )
 
         # Build Inner Pipeline instance directly, will be shared by threads
-        print("Building inner pipeline...")
+        # print("Building inner pipeline...") # Less verbose
         self.inner_pipeline = self._build_inner_pipeline(self.config.get('stages', []))
-        print(f"Inner pipeline stages: {[s.__class__.__name__ for s in self.inner_pipeline.stages]}")
+        # print(f"Inner pipeline stages: {[s.__class__.__name__ for s in self.inner_pipeline.stages]}") # Less verbose
 
         self.data_loader_params = self.config.get('data_loader_params', {})
         self.dataset_types_to_process = self.config.get('dataset_types_to_process', ['Train', 'Validation', 'Test'])
@@ -129,7 +106,6 @@ class ConfigurablePipeline:
         for stage_config in stage_configs:
             stage_name = stage_config['name']
             params = stage_config.get('params', {})
-            # print(f"  Loading stage: {stage_name}") # Less verbose
 
             common_needed = self.STAGE_COMMON_PARAMS.get(stage_name, [])
             if "pipeline_version" in common_needed: params['pipeline_version'] = self.pipeline_version
@@ -159,68 +135,51 @@ class ConfigurablePipeline:
         filename = f"{clip_folder}_{self.pipeline_version}.pt"
         return os.path.join(self.cache_root,"PipelineResult", self.config_name, self.pipeline_version, dataset_type, subfolder, filename)
 
-    def process_dataset(self, dataset_type: str, max_workers: Optional[int] = None) -> None:
-        """ Process all rows for a dataset type using ThreadPoolExecutor. """
-        print(f"\n--- Processing dataset: {dataset_type} ---")
-        source_data = self.source_stage.process(verbose=False)
+    # --- Renamed method to avoid confusion ---
+    def _process_rows_for_dataset(self, df: pd.DataFrame, dataset_type: str, max_workers: Optional[int], overall_progress_bar: tqdm) -> Tuple[int, int, int]:
+        """ Process rows from a given DataFrame using ThreadPoolExecutor, updating an overall progress bar. """
+        # This method now processes a specific dataframe and updates the external bar.
 
-        df = None
-        try: # Load appropriate split dataframe
-            if dataset_type.lower() == 'train': df = source_data.get_train_data()
-            elif dataset_type.lower() in ['validation', 'val']: df = source_data.get_validation_data()
-            elif dataset_type.lower() == 'test': df = source_data.get_test_data()
-            else: raise ValueError(f"Invalid dataset_type: {dataset_type}")
-        except FileNotFoundError as e: print(f"Warning: Split CSV not found for {dataset_type}: {e}. Skipping."); return
-        except Exception as e: print(f"Error loading split CSV for {dataset_type}: {e}. Skipping."); return
-
-        if df is None or df.empty: print(f"Warning: No data loaded for '{dataset_type}'. Skipping."); return
-
-        total_rows = len(df)
-        # Determine number of workers for threads (can often be higher than CPU count for I/O)
-        # Default to a reasonable number like cpu_count * 2 or a fixed number like 16
+        total_rows_in_df = len(df)
         num_workers = max(1, max_workers or (os.cpu_count() * 2 if os.cpu_count() else 4))
-        num_workers = min(num_workers, total_rows) # Don't need more threads than rows
+        num_workers = min(num_workers, total_rows_in_df)
 
-        print(f"Processing {total_rows} rows for {dataset_type} using up to {num_workers} threads...")
         processed, skipped, errors = 0, 0, 0
 
         futures = []
-        # Use ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            # Submit all tasks
             for _, row in df.iterrows():
                 row_dict = row.to_dict()
                 row_dict['dataset_type'] = dataset_type
-                # Pass the pipeline instance 'self' to the worker thread
                 future = executor.submit(_process_single_row_thread_worker, row_dict, self)
                 futures.append(future)
 
-            # Process results as they complete with tqdm progress bar
-            progress_bar = tqdm(as_completed(futures), total=len(futures), desc=f"Processing {dataset_type}", unit="row")
-            for future in progress_bar:
+            # Use as_completed without creating a new tqdm bar
+            for future in as_completed(futures):
                 try:
-                    result = future.result() # Get result from thread
+                    result = future.result()
                     status = result.get('status', 'error')
                     if status == 'processed': processed += 1
                     elif status == 'skipped': skipped += 1
                     elif status == 'error':
                         errors += 1; clip = result.get('clip', 'N/A'); error_msg = result.get('error', 'Unknown error')
-                        tqdm.write(f"\n! Thread Error (clip: {clip}) ! Error: {error_msg[:500]}...")
-                except Exception as e: # Catch errors from future.result() itself
-                    errors += 1; tqdm.write(f"\n! Critical error fetching result from thread ! Error: {e}")
+                        overall_progress_bar.write(f"\n! Thread Error (clip: {clip}) ! Error: {error_msg[:500]}...")
+                except Exception as e:
+                    errors += 1; overall_progress_bar.write(f"\n! Critical error fetching result from thread ! Error: {e}")
 
-                # Update tqdm postfix display
-                if (processed + skipped + errors) % 10 == 0 or errors > 0:
-                     progress_bar.set_postfix(Processed=processed, Skipped=skipped, Errors=errors, refresh=False)
+                # --- Update the OVERALL progress bar ---
+                overall_progress_bar.update(1)
+                # Update postfix on the overall bar
+                if (processed + skipped + errors) % 20 == 0 or errors > 0: # Update less frequently
+                     overall_progress_bar.set_postfix(Processed=processed, Skipped=skipped, Errors=errors, refresh=False)
 
-            progress_bar.set_postfix(Processed=processed, Skipped=skipped, Errors=errors, refresh=True)
-
-        print(f"--- Finished {dataset_type}: Processed={processed}, Skipped={skipped}, Errors={errors} ---")
+        # Return counts for this dataset type
+        return processed, skipped, errors
 
 
     def create_dataloader(self, dataset_type: str) -> Optional[DataLoader]:
         """ Create DataLoader from cached results for a dataset type. """
-        print(f"\n--- Creating DataLoader for: {dataset_type} ---")
+        # print(f"\n--- Creating DataLoader for: {dataset_type} ---") # Less verbose
         dl_params = self.data_loader_params
         batch_size = dl_params.get('batch_size', 32)
         num_workers = dl_params.get('num_workers', 0)
@@ -233,8 +192,8 @@ class ConfigurablePipeline:
              return None
         try:
             dataset = CachedTensorDataset(cache_results_dir)
-            print(f"Found {len(dataset)} samples in {cache_results_dir} (recursive search).")
-            if len(dataset) == 0: return None
+            # print(f"Found {len(dataset)} samples in {cache_results_dir} (recursive search).") # Less verbose
+            if len(dataset) == 0: print(f"Warning: No samples found for DataLoader in {cache_results_dir}."); return None
             should_shuffle = (dataset_type.lower() == 'train')
             return DataLoader(dataset, batch_size=batch_size, shuffle=should_shuffle,
                               num_workers=num_workers, pin_memory=pin_memory)
@@ -242,17 +201,70 @@ class ConfigurablePipeline:
             print(f"Error creating DataLoader for {dataset_type} from {cache_results_dir}: {e}")
             return None
 
+    # --- Modified run method ---
     def run(self, max_workers: Optional[int] = None) -> Tuple[Optional[DataLoader], Optional[DataLoader], Optional[DataLoader]]:
-        """ Run pipeline for configured datasets and return DataLoaders. """
+        """ Run pipeline for configured datasets with a single overall progress bar. """
         print(f"\n=== Starting Pipeline Run: '{self.config_name}' / v{self.pipeline_version} ===")
         run_start_time = time.time()
-        for ds in self.dataset_types_to_process:
-            # Pass max_workers for threading pool size
-            self.process_dataset(ds, max_workers=max_workers)
 
+        # 1. Ensure split files are created/cached
+        print("Preparing dataset splits...")
+        source_data = self.source_stage.process(verbose=False)
+
+        # 2. Load dataframes and calculate total rows for overall progress
+        dfs_to_process = []
+        total_rows = 0
+        print("Loading dataframes to calculate total size...")
+        for ds_type in self.dataset_types_to_process:
+            df = None
+            try:
+                if ds_type.lower() == 'train': df = source_data.get_train_data()
+                elif ds_type.lower() in ['validation', 'val']: df = source_data.get_validation_data()
+                elif ds_type.lower() == 'test': df = source_data.get_test_data()
+
+                if df is not None and not df.empty:
+                    dfs_to_process.append({'type': ds_type, 'df': df})
+                    total_rows += len(df)
+                    print(f"  Loaded {ds_type}: {len(df)} rows")
+                else:
+                    print(f"  Warning: No data loaded for {ds_type}.")
+            except FileNotFoundError: print(f"  Warning: Split CSV not found for {ds_type}.")
+            except Exception as e: print(f"  Error loading split CSV for {ds_type}: {e}.")
+
+        if total_rows == 0:
+            print("Error: No rows found to process across all specified dataset types.")
+            return (None, None, None)
+
+        # 3. Create the single overall progress bar
+        print(f"\nTotal rows to process across all datasets: {total_rows}")
+        overall_progress_bar = tqdm(total=total_rows, desc="Overall Progress", unit="row", leave=True)
+        total_processed, total_skipped, total_errors = 0, 0, 0
+
+        # 4. Process each dataframe sequentially, updating the overall bar using threads internally
+        for data_info in dfs_to_process:
+            ds_type = data_info['type']
+            df = data_info['df']
+            overall_progress_bar.set_description(f"Processing {ds_type}") # Update description
+            # Call the processing method for this specific dataframe
+            processed, skipped, errors = self._process_rows_for_dataset(
+                df, ds_type, max_workers, overall_progress_bar
+            )
+            # Accumulate totals (optional, as postfix updates within the method)
+            total_processed += processed
+            total_skipped += skipped
+            total_errors += errors
+            # Ensure final postfix for this dataset is shown on the overall bar
+            overall_progress_bar.set_postfix(Processed=total_processed, Skipped=total_skipped, Errors=total_errors, refresh=True)
+
+
+        overall_progress_bar.close() # Close the main bar
+
+        # 5. Create DataLoaders
+        print("\n--- Creating DataLoaders ---")
         loaders = {ds_type.lower(): self.create_dataloader(ds_type) for ds_type in self.dataset_types_to_process}
 
         print(f"\n=== Pipeline Run Finished ({self.config_name} / v{self.pipeline_version}) | Total time: {(time.time() - run_start_time):.2f}s ===")
+        print(f"Final Counts: Processed={total_processed}, Skipped={total_skipped}, Errors={total_errors}")
         return (loaders.get('train'), loaders.get('validation') or loaders.get('val'), loaders.get('test'))
 
 
@@ -260,21 +272,19 @@ class ConfigurablePipeline:
 if __name__ == "__main__":
     # Removed multiprocessing.freeze_support()
 
-    config_file_path = "./configs/ENGAGENET_10fps_quality95_randdist.json"
+    config_file_path = "./configs/ENGAGENET_10fps_quality95_randdist.json" # Or your DAISEE config path
     if not os.path.exists(config_file_path):
         print(f"Error: Configuration file not found at '{config_file_path}'")
-        # ... (print example structure) ...
         exit()
 
     print(f"\n--- Loading Config and Running Pipeline from: {config_file_path} ---")
     try:
         pipeline = ConfigurablePipeline(config_path=config_file_path)
 
-        num_threads_to_use = 4
-        # Or set a fixed number:
-        # num_threads_to_use = 16
+        # Set number of threads for row processing
+        num_threads_to_use = 4 # Adjust based on testing
         print(f"Attempting to use max_workers = {num_threads_to_use} (threads)")
-        train_loader, val_loader, test_loader = pipeline.run(max_workers=num_threads_to_use) # Pass thread limit
+        train_loader, val_loader, test_loader = pipeline.run(max_workers=num_threads_to_use)
 
         if train_loader: print(f"\nTrain DataLoader created with {len(train_loader)} batches.")
         if val_loader: print(f"Validation DataLoader created with {len(val_loader)} batches.")
