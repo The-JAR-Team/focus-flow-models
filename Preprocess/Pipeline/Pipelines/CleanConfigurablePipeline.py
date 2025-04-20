@@ -102,14 +102,12 @@ class ConfigurablePipeline:
         return OrchestrationPipeline(stages=stages)
 
     def _get_expected_cache_path(self, row_data: dict, dataset_type: str) -> str:
-        """ Calculate final tensor cache path. MUST match TensorSavingStage logic. """
-        # (Same as previous versions)
-        clip_folder = str(row_data.get('clip_folder', 'UnknownClip')) # Use .get for safety
+        clip_folder = str(row_data.get('clip_folder', 'UnknownClip'))
         person_id = str(row_data.get('person', 'UnknownPerson'))
         subfolder = person_id
         filename = f"{clip_folder}_{self.pipeline_version}.pt"
-        # Construct path relative to cache root
-        return os.path.join(self.cache_root,"PipelineResult", self.config_name, self.pipeline_version, dataset_type, subfolder, filename)
+        return os.path.join(self.cache_root, "PipelineResult", self.config_name, self.pipeline_version, dataset_type,
+                            subfolder, filename)
 
     def create_dataloader(self, dataset_type: str) -> Optional[Any]: # Use Any for DataLoader type hint
         """ Create DataLoader from cached results for a dataset type. """

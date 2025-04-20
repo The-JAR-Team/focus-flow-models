@@ -94,7 +94,7 @@ if __name__ == "__main__":
     # Direct call - assumes inspect was imported successfully
     if os.path.isdir(BASE_RESULTS_DIR):
         try:
-            inspect(BASE_RESULTS_DIR, INSPECT_BATCH_SIZE)
+            inspect(CONFIG_FILE_PATH, 64)
             print("\n--- Inspection Complete ---")
         except Exception as e:
             # Still keep error handling for the *execution* of inspect
