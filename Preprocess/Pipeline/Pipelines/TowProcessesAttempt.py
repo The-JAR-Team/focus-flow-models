@@ -226,29 +226,24 @@ def run_pipeline_splits(config_path: str, dataset_types: List[str], tqdm_positio
         traceback.print_exc()
 
 
-# ----- Example Usage -----
-if __name__ == "__main__":
+def run_tow_processes_pipeline(config_path: str):
+    """
+    Run the pipeline in two processes for the specified dataset types.
+    This function is a wrapper to handle multiprocessing and tqdm positioning.
+    """
     multiprocessing.freeze_support()
 
-    # Use the config file path provided by the user previously
-    config_file_path = "./configs/ENGAGENET_10fps_quality95_randdist.json" # Or your DAISEE config path
-
-    if not os.path.exists(config_file_path):
-        print(f"Error: Configuration file not found at '{config_file_path}'")
+    if not os.path.exists(config_path):
+        print(f"Error: Configuration file not found at '{config_path}'")
         exit()
 
-    print(f"\n--- Loading Config from: {config_file_path} ---")
-
-    # Define the split assignments
     process1_datasets = ['Train']
     process2_datasets = ['Validation', 'Test']
 
-    # print(f"Assigning Process 1 (tqdm pos 0) to: {process1_datasets}") # Less verbose
-    # print(f"Assigning Process 2 (tqdm pos 1) to: {process2_datasets}")
-
-    # --- Create Process objects, passing tqdm_position ---
-    process1 = multiprocessing.Process(target=run_pipeline_splits, args=(config_file_path, process1_datasets, 0)) # Position 0
-    process2 = multiprocessing.Process(target=run_pipeline_splits, args=(config_file_path, process2_datasets, 1)) # Position 1
+    print(f"\n--- Loading Config from: {config_path} ---")
+    # Create two processes with different dataset assignments
+    process1 = multiprocessing.Process(target=run_pipeline_splits, args=(config_path, process1_datasets, 0))
+    process2 = multiprocessing.Process(target=run_pipeline_splits, args=(config_path, process2_datasets, 1))
 
     print("\n--- Starting Parallel Processing (Dataset Level) ---")
     run_start_time = time.time()
@@ -263,11 +258,10 @@ if __name__ == "__main__":
 
     run_end_time = time.time()
     print(f"\n--- All Processing Finished | Total time: {(run_end_time - run_start_time):.2f}s ---")
-
     # --- Create DataLoaders (in main process after workers finish) ---
     print("\n--- Creating DataLoaders ---")
     try:
-        final_pipeline = ConfigurablePipeline(config_path=config_file_path) # Re-init to use create_dataloader
+        final_pipeline = ConfigurablePipeline(config_path=config_path)  # Re-init to use create_dataloader
         train_loader = final_pipeline.create_dataloader('Train')
         val_loader = final_pipeline.create_dataloader('Validation') or final_pipeline.create_dataloader('Val')
         test_loader = final_pipeline.create_dataloader('Test')
@@ -277,4 +271,11 @@ if __name__ == "__main__":
         if test_loader: print(f"Test DataLoader created with {len(test_loader)} batches.")
     except Exception as e:
         print(f"\n!!! Error creating DataLoaders: {e} !!!")
-        import traceback; traceback.print_exc()
+        import traceback;
+        traceback.print_exc()
+
+
+# ----- Example Usage -----
+if __name__ == "__main__":
+    config_file_path = "./configs/ENGAGENET_10fps_quality95_randdist.json" # Or your DAISEE config path
+    run_tow_processes_pipeline(config_file_path)

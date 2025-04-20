@@ -2,7 +2,7 @@
   "config_name": "10fps_quality95",
   "pipeline_version": "01",
   "dataset_name": "DAiSEE",
-  "metadata_csv_path": "../Metadata/daisee_metadata.csv",
+  "metadata_csv_path": "./Preprocess/Pipeline/MetaData/daisee_metadata.csv",
   "cache_dir": null,
   "dataset_root": null,
   "source_stage_config": {

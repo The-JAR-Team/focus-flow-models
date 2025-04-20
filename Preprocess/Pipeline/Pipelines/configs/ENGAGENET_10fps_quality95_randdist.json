@@ -2,7 +2,7 @@
   "config_name": "EngageNet_10fps_quality95_RandSplit_60_20_20",
   "pipeline_version": "03",
   "dataset_name": "EngageNet",
-  "metadata_csv_path": "../Metadata/engagenet_metadata.csv",
+  "metadata_csv_path": "./Preprocess/Pipeline/MetaData/engagenet_metadata.csv",
   "cache_dir": null,
   "dataset_root": null,
   "source_stage_config": {

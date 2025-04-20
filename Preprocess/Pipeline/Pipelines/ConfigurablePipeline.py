@@ -268,28 +268,34 @@ class ConfigurablePipeline:
         return (loaders.get('train'), loaders.get('validation') or loaders.get('val'), loaders.get('test'))
 
 
+def run_threaded_pipeline(config_path: str, max_workers: int = 1) -> Tuple[Optional[DataLoader], Optional[DataLoader], Optional[DataLoader]]:
+    """ Run the pipeline with threading support. pipeline.run(max_workers=max_workers)"""
+    train_loader, val_loader, test_loader = None, None, None
+
+    if not os.path.exists(config_path):
+        print(f"Error: Configuration file not found at '{config_path}'")
+        exit()
+    else:
+        print(f"\n--- Loading Config and Running Pipeline from: {config_path} ---")
+        try:
+            pipeline = ConfigurablePipeline(config_path=config_path)
+            train_loader, val_loader, test_loader = pipeline.run(max_workers=max_workers)
+
+            if train_loader: print(f"\nTrain DataLoader created with {len(train_loader)} batches.")
+            if val_loader: print(f"Validation DataLoader created with {len(val_loader)} batches.")
+            if test_loader: print(f"Test DataLoader created with {len(test_loader)} batches.")
+
+        except Exception as e:
+             print(f"\n!!! Pipeline execution failed: {e} !!!")
+             import traceback; traceback.print_exc()
+
+    return train_loader, val_loader, test_loader
+
+
 # ----- Example Usage -----
 if __name__ == "__main__":
     # Removed multiprocessing.freeze_support()
 
     config_file_path = "./configs/ENGAGENET_10fps_quality95_randdist.json" # Or your DAISEE config path
-    if not os.path.exists(config_file_path):
-        print(f"Error: Configuration file not found at '{config_file_path}'")
-        exit()
-
-    print(f"\n--- Loading Config and Running Pipeline from: {config_file_path} ---")
-    try:
-        pipeline = ConfigurablePipeline(config_path=config_file_path)
-
-        # Set number of threads for row processing
-        num_threads_to_use = 4 # Adjust based on testing
-        print(f"Attempting to use max_workers = {num_threads_to_use} (threads)")
-        train_loader, val_loader, test_loader = pipeline.run(max_workers=num_threads_to_use)
-
-        if train_loader: print(f"\nTrain DataLoader created with {len(train_loader)} batches.")
-        if val_loader: print(f"Validation DataLoader created with {len(val_loader)} batches.")
-        if test_loader: print(f"Test DataLoader created with {len(test_loader)} batches.")
-
-    except Exception as e:
-         print(f"\n!!! Pipeline execution failed: {e} !!!")
-         import traceback; traceback.print_exc()
+    max_workers = 4 # Adjust as needed
+    run_threaded_pipeline(config_file_path, max_workers)
