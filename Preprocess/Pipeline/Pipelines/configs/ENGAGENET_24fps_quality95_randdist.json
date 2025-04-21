@@ -1,0 +1,53 @@
+{
+  "config_name": "EngageNet_24fps_quality95_RandSplit_60_20_20",
+  "pipeline_version": "04",
+  "dataset_name": "EngageNet",
+  "metadata_csv_path": "./Preprocess/Pipeline/MetaData/engagenet_metadata.csv",
+  "cache_dir": null,
+  "dataset_root": null,
+  "source_stage_config": {
+    "perform_random_split": true,
+    "random_seed": 42,
+    "train_ratio": 0.6,
+    "val_ratio": 0.2,
+    "test_ratio": 0.2,
+    "stratify_column": "engagement_label"
+  },
+  "stages": [
+    {
+      "name": "FrameExtractionStage",
+      "params": {
+        "save_frames": false,
+        "desired_fps": 24.0,
+        "jpeg_quality": 95,
+        "resize_width": null,
+        "resize_height": null
+      }
+    },
+    {
+      "name": "MediapipeProcessingStage",
+      "params": {}
+    },
+    {
+      "name": "TensorStackingStage",
+      "params": {
+        "target_frames": 240,
+        "num_landmarks": 478,
+        "dims": 3
+      }
+    },
+    {
+      "name": "TensorSavingStage",
+      "params": {}
+    }
+  ],
+  "data_loader_params": {
+    "batch_size": 32,
+    "num_workers": 0
+  },
+  "dataset_types_to_process": [
+    "Train",
+    "Validation",
+    "Test"
+  ]
+}

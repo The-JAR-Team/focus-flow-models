@@ -11,22 +11,17 @@ from Preprocess.Pipeline.Pipelines.TowProcessesAttempt import run_two_processes_
 from Preprocess.Pipeline.Pipelines.ConfigurablePipeline import run_threaded_pipeline
 
 # --- Data Inspection Import ---
-from Preprocess.Pipeline.InspectData import inspect
-
+from Preprocess.Pipeline.InspectData import inspect, get_dataloader
 
 # --- Configuration ---
-# Absolute path to the base directory where pipeline results are stored
-# Adjust this path to match the output structure of your pipelines
-BASE_RESULTS_DIR = r"C:\Users\bhbha\OneDrive - The Academic College of Tel-Aviv Jaffa - MTA\Desktop\dataset\Cache\PipelineResult\EngageNet_10fps_quality95_RandSplit_60_20_20\03" # <<<--- ADJUST THIS PATH ---<<<
-
 # Batch size for the data inspection step
 INSPECT_BATCH_SIZE = 32
 
 # Path to the pipeline configuration JSON file (relative to this run.py script)
-CONFIG_FILE_PATH = "./Preprocess/Pipeline/Pipelines/configs/ENGAGENET_10fps_quality95_randdist.json"
+CONFIG_FILE_PATH = f"./Preprocess/Pipeline/Pipelines/configs/ENGAGENET_10fps_quality95_randdist.json"
 
 # Parameters specific to the threaded execution mode
-THREADED_MAX_WORKERS = None # Let the pipeline choose default (e.g., os.cpu_count() * 2), or set manually (e.g., 8, 16)
+THREADED_MAX_WORKERS = 4  # Let the pipeline choose default (e.g., os.cpu_count() * 2), or set manually (e.g., 8, 16)
 THREADED_CHUNK_SIZE = 128   # Number of rows processed per thread task
 
 
@@ -90,9 +85,9 @@ if __name__ == "__main__":
 
 
     # --- Inspect Results (Runs after the selected pipeline finishes) ---
-    print(f"\n--- Inspecting Results in: {BASE_RESULTS_DIR} ---")
+    print(f"\n--- Inspecting Results in: {CONFIG_FILE_PATH} ---")
     # Direct call - assumes inspect was imported successfully
-    if os.path.isdir(BASE_RESULTS_DIR):
+    if os.path.exists(CONFIG_FILE_PATH):
         try:
             inspect(CONFIG_FILE_PATH, 64)
             print("\n--- Inspection Complete ---")
@@ -102,7 +97,9 @@ if __name__ == "__main__":
             import traceback
             traceback.print_exc()
     else:
-        print(f"Warning: Base results directory for inspection not found: {BASE_RESULTS_DIR}")
+        print(f"Warning: Base results directory for inspection not found: {CONFIG_FILE_PATH}")
 
-
+    train_loader = get_dataloader(CONFIG_FILE_PATH, "train", INSPECT_BATCH_SIZE, num_workers_override=0, shuffle=True)
+    val_loader = get_dataloader(CONFIG_FILE_PATH, "Validation", INSPECT_BATCH_SIZE, num_workers_override=0)
+    test_loader = get_dataloader(CONFIG_FILE_PATH, "test", INSPECT_BATCH_SIZE, num_workers_override=0)
     print("\n--- run.py Finished ---")
