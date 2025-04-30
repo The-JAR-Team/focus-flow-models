@@ -14,7 +14,7 @@ NUM_GRU_LAYERS = 2
 DROPOUT_RATE = 0.4
 LEARNING_RATE = 0.0001
 BATCH_SIZE = 32
-NUM_EPOCHS = 40
+NUM_EPOCHS = 1
 
 # --- Saving & Loading ---
 # Base name for saved files (paths will be constructed)
