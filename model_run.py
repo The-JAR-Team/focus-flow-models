@@ -217,17 +217,20 @@ if __name__ == "__main__":
     if trained_model and test_loader:
         print("\nStarting evaluation process...")
         try:
-            # Call the evaluation function from evaluation.py
-            evaluate_model(
+            test_loss, multi_class_acc, binary_acc = evaluate_model(
                 model=trained_model,
                 test_loader=test_loader,
-                criterion=criterion, # Use the same criterion for loss calculation
+                criterion=criterion,  # Use the same criterion for loss calculation
                 device=config.DEVICE,
                 label_to_idx_map=config.LABEL_TO_IDX_MAP,
                 idx_to_score_map=config.IDX_TO_SCORE_MAP,
                 idx_to_name_map=config.IDX_TO_NAME_MAP,
-                confusion_matrix_path=config.CONFUSION_MATRIX_PATH
+                confusion_matrix_path=config.CONFUSION_MATRIX_PATH,
             )
+            # You can now use test_loss, multi_class_acc, binary_acc if needed later in the script
+            print(
+                f"\nEvaluation Summary: Test Loss={test_loss:.4f}, Multi-Class Acc={multi_class_acc:.4f}, Binary Acc={binary_acc:.4f}")
+
         except Exception as e:
             print(f"\n!!! ERROR during evaluation: {e} !!!")
             traceback.print_exc()

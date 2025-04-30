@@ -1,3 +1,5 @@
+# evaluation.py
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -6,9 +8,36 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, mean_absolute_error, r2_score
 import os
-from typing import Dict, Tuple
-from Model.engagement_regression_model import EngagementRegressionModel
-from Model.utils import get_targets, map_score_to_class_idx
+from typing import Dict, Tuple, List  # Added List
+import numpy as np  # Added numpy for filtering
+
+# --- Import Model Definition ---
+# This assumes the model definition is accessible. If not, adjust the import path.
+try:
+    from Model.engagement_regression_model import EngagementRegressionModel
+except ImportError:
+    print("Warning: Could not import EngagementRegressionModel. Ensure it's in the correct path.")
+
+
+    # Define a dummy class if needed for type hinting, or remove type hint
+    class EngagementRegressionModel(nn.Module):
+        pass
+
+# --- Import Utility Functions ---
+# This assumes utils are accessible. If not, adjust the import path.
+try:
+    from Model.utils import get_targets, map_score_to_class_idx
+except ImportError:
+    print("Warning: Could not import utility functions from Model.utils.")
+
+
+    # Define dummy functions if needed
+    def get_targets(*args, **kwargs):
+        return None, None
+
+
+    def map_score_to_class_idx(*args, **kwargs):
+        return torch.tensor([])
 
 
 # ================================================
@@ -28,13 +57,13 @@ def plot_training_history(history: Dict, loss_curve_path: str, acc_curve_path: s
     if not history or not history.get('train_loss') or not history.get('val_loss'):
         print("Plotting skipped: Insufficient history data for loss curves.")
         return
-    if not history.get('val_accuracy_mapped'):
-        print("Plotting skipped: Insufficient history data for accuracy curve.")
-        return
-
+    # Allow plotting even if mapped accuracy isn't present, just skip that part
+    # if not history.get('val_accuracy_mapped'):
+    #     print("Plotting skipped: Insufficient history data for accuracy curve.")
+    #     return
 
     epochs = range(1, len(history['train_loss']) + 1)
-    plt.style.use('seaborn-v0_8-darkgrid') # Use a modern seaborn style
+    plt.style.use('seaborn-v0_8-darkgrid')  # Use a modern seaborn style
 
     # --- Loss Plot ---
     try:
@@ -57,18 +86,18 @@ def plot_training_history(history: Dict, loss_curve_path: str, acc_curve_path: s
         plt.title('Loss Difference (Val - Train)')
         plt.xlabel('Epochs')
         plt.ylabel('Loss Difference')
-        plt.axhline(0, color='grey', lw=0.5, linestyle='--') # Zero line for reference
+        plt.axhline(0, color='grey', lw=0.5, linestyle='--')  # Zero line for reference
         plt.legend()
         plt.grid(True)
 
-        plt.tight_layout() # Adjust layout to prevent overlap
+        plt.tight_layout()  # Adjust layout to prevent overlap
         plt.savefig(loss_curve_path)
         print(f"Loss curves plot saved to {loss_curve_path}")
-        plt.close() # Close the figure to free memory
+        plt.close()  # Close the figure to free memory
 
     except Exception as e:
         print(f"Error plotting loss curves: {e}")
-        plt.close() # Ensure plot is closed even if error occurs
+        plt.close()  # Ensure plot is closed even if error occurs
 
     # --- Mapped Accuracy Plot ---
     if 'val_accuracy_mapped' in history and history['val_accuracy_mapped']:
@@ -78,7 +107,7 @@ def plot_training_history(history: Dict, loss_curve_path: str, acc_curve_path: s
             plt.title('Validation Accuracy (Mapped from Regression)')
             plt.xlabel('Epochs')
             plt.ylabel('Accuracy')
-            plt.ylim(0, 1) # Accuracy is typically between 0 and 1
+            plt.ylim(0, 1)  # Accuracy is typically between 0 and 1
             plt.legend()
             plt.grid(True)
             plt.tight_layout()
@@ -88,23 +117,28 @@ def plot_training_history(history: Dict, loss_curve_path: str, acc_curve_path: s
         except Exception as e:
             print(f"Error plotting mapped accuracy curve: {e}")
             plt.close()
+    else:
+        print("Skipping mapped accuracy plot: 'val_accuracy_mapped' not found in history.")
+
 
 # ================================================
 # === Evaluation Function ===
 # ================================================
 def evaluate_model(
-    model: EngagementRegressionModel,
-    test_loader: DataLoader,
-    criterion: nn.Module,
-    device: torch.device,
-    label_to_idx_map: Dict[str, int], # Pass maps explicitly
-    idx_to_score_map: Dict[int, float], # Pass maps explicitly
-    idx_to_name_map: Dict[int, str],   # Pass maps explicitly
-    confusion_matrix_path: str
-    ) -> Tuple[float, float]:
+        model: EngagementRegressionModel,
+        test_loader: DataLoader,
+        criterion: nn.Module,
+        device: torch.device,
+        label_to_idx_map: Dict[str, int],
+        idx_to_score_map: Dict[int, float],
+        idx_to_name_map: Dict[int, str],
+        confusion_matrix_path: str,
+        snp_index: int = 4  # Pass SNP index explicitly, defaulting to 4 based on config
+) -> Tuple[float, float, float]:  # Modified return signature
     """
-    Evaluates the model on the test set, reporting MSE loss and mapped classification metrics.
-    Saves a confusion matrix plot.
+    Evaluates the model on the test set, reporting MSE loss, mapped multi-class metrics,
+    and mapped binary classification metrics (Engaged vs. Not Engaged).
+    Saves confusion matrix plots for both multi-class and binary evaluations.
 
     Args:
         model (EngagementRegressionModel): The trained model instance.
@@ -114,61 +148,79 @@ def evaluate_model(
         label_to_idx_map (Dict[str, int]): Mapping from string labels to class indices.
         idx_to_score_map (Dict[int, float]): Mapping from class indices to regression scores.
         idx_to_name_map (Dict[int, str]): Mapping from class indices to class names.
-        confusion_matrix_path (str): Path to save the confusion matrix plot.
+        confusion_matrix_path (str): Base path to save confusion matrix plots.
+                                     '_binary' will be appended for the binary plot.
+        snp_index (int): The index corresponding to the 'SNP' class, to be excluded
+                         from binary evaluation. Defaults to 4.
 
     Returns:
-        Tuple[float, float]: A tuple containing:
+        Tuple[float, float, float]: A tuple containing:
             - final_test_loss (float): The average MSE loss on the test set.
-            - final_cls_acc (float): The accuracy based on mapped class predictions.
+            - final_cls_acc (float): The accuracy based on mapped multi-class predictions.
+            - final_binary_acc (float): The accuracy based on mapped binary predictions
+                                        (excluding SNP samples), or 0.0 if not calculable.
     """
     print("\n--- Evaluating on Test Set ---")
-    model.eval() # Set model to evaluation mode
+    model.eval()  # Set model to evaluation mode
     test_loss = 0.0
     test_samples = 0
     # Lists to store predictions and targets for metric calculation
-    all_pred_scores = []
-    all_target_scores = []
-    all_pred_classes = []
-    all_target_classes = []
-    final_cls_acc = 0.0 # Default value in case metrics can't be calculated
+    all_pred_scores_list: List[float] = []
+    all_target_scores_list: List[float] = []
+    all_pred_classes_list: List[int] = []
+    all_target_classes_list: List[int] = []
+    final_cls_acc = 0.0  # Default value
+    final_binary_acc = 0.0  # Default value
 
-    with torch.no_grad(): # Disable gradient calculations
+    with torch.no_grad():  # Disable gradient calculations
         test_pbar = tqdm(test_loader, desc="Testing", leave=False, ncols=100)
         for inputs, labels_dict in test_pbar:
-            if not isinstance(inputs, torch.Tensor): continue
+            if not isinstance(inputs, torch.Tensor):
+                print("Warning: Skipping batch, inputs are not a tensor.")
+                continue
             inputs = inputs.to(device)
 
             # Get target scores and indices
             targets = get_targets(labels_dict, label_to_idx_map, idx_to_score_map)
-            if targets is None: continue # Skip invalid batches
+            if targets is None:
+                print("Warning: Skipping batch, failed to get targets.")
+                continue  # Skip invalid batches
             target_scores, target_indices = targets
             target_scores = target_scores.to(device)
-            # Keep target_indices on CPU for easier accumulation with sklearn metrics later
+            # Keep target_indices on CPU for easier accumulation
 
             batch_size = inputs.size(0)
             test_samples += batch_size
 
             # Get model predictions
-            pred_scores = model(inputs) # Shape: (batch_size, 1)
+            pred_scores = model(inputs)  # Shape: (batch_size, 1)
             # Calculate loss for this batch
             loss = criterion(pred_scores, target_scores)
-            test_loss += loss.item() * batch_size # Accumulate total loss
+            test_loss += loss.item() * batch_size  # Accumulate total loss
 
             # Map predictions to classes
-            pred_classes = map_score_to_class_idx(pred_scores) # Shape: (batch_size) or (batch_size, 1)
+            # Ensure map_score_to_class_idx returns integer indices directly
+            pred_classes = map_score_to_class_idx(pred_scores)  # Expects (batch_size) tensor of indices
 
             # Collect scores and classes (move predictions to CPU)
-            all_pred_scores.extend(pred_scores.squeeze().cpu().numpy())
-            all_target_scores.extend(target_scores.squeeze().cpu().numpy())
-            all_pred_classes.extend(pred_classes.squeeze().cpu().numpy())
-            all_target_classes.extend(target_indices.cpu().numpy()) # Already on CPU
+            all_pred_scores_list.extend(pred_scores.squeeze().cpu().tolist())
+            all_target_scores_list.extend(target_scores.squeeze().cpu().tolist())
+            # Ensure pred_classes and target_indices are 1D lists of integers
+            all_pred_classes_list.extend(pred_classes.squeeze().cpu().tolist())
+            all_target_classes_list.extend(target_indices.cpu().tolist())  # Already on CPU
+
+    # Convert lists to numpy arrays for easier handling
+    all_pred_scores = np.array(all_pred_scores_list)
+    all_target_scores = np.array(all_target_scores_list)
+    all_pred_classes = np.array(all_pred_classes_list)
+    all_target_classes = np.array(all_target_classes_list)
 
     # --- Calculate and Print Overall Metrics ---
-    final_test_loss = test_loss / test_samples if test_samples > 0 else 0
+    final_test_loss = (test_loss / test_samples) if test_samples > 0 else 0
     print(f"\nTest MSE Loss: {final_test_loss:.6f}")
 
     # Ensure we have collected data before calculating metrics
-    if not all_target_scores or not all_pred_scores:
+    if len(all_target_scores) == 0 or len(all_pred_scores) == 0:
         print("\nWarning: No valid scores collected. Skipping regression metrics.")
     else:
         # --- Regression Metrics ---
@@ -180,10 +232,11 @@ def evaluate_model(
         except Exception as e:
             print(f"Could not calculate regression metrics: {e}")
 
-    if not all_target_classes or not all_pred_classes:
-         print("\nWarning: No valid classes collected. Skipping classification metrics.")
+    # --- Multi-class Classification Metrics ---
+    print("\n--- Evaluating Multi-Class Classification (Mapped) ---")
+    if len(all_target_classes) == 0 or len(all_pred_classes) == 0:
+        print("\nWarning: No valid classes collected. Skipping multi-class classification metrics.")
     else:
-        # --- Mapped Classification Metrics ---
         try:
             # Determine the unique set of labels present in targets and predictions
             present_labels = sorted(list(set(all_target_classes) | set(all_pred_classes)))
@@ -192,38 +245,114 @@ def evaluate_model(
 
             # Calculate accuracy
             final_cls_acc = accuracy_score(all_target_classes, all_pred_classes)
-            print(f"\nTest Classification Accuracy (mapped): {final_cls_acc:.4f}")
+            print(f"\nTest Multi-Class Accuracy (mapped): {final_cls_acc:.4f}")
 
             # Generate classification report
-            print("\nClassification Report (mapped):")
+            print("\nMulti-Class Classification Report (mapped):")
             # Use present_labels to ensure the report only includes relevant classes
-            print(classification_report(all_target_classes, all_pred_classes, labels=present_labels, target_names=target_names, digits=4, zero_division=0))
+            print(classification_report(all_target_classes, all_pred_classes, labels=present_labels,
+                                        target_names=target_names, digits=4, zero_division=0))
 
             # Generate confusion matrix
-            print("Confusion Matrix (mapped):")
+            print("Multi-Class Confusion Matrix (mapped):")
             cm = confusion_matrix(all_target_classes, all_pred_classes, labels=present_labels)
             print(cm)
 
             # Plot Confusion Matrix
             try:
                 # Adjust figure size based on the number of labels for better readability
-                plt.figure(figsize=(max(7, len(present_labels)), max(5, len(present_labels)-1)))
+                plt.figure(figsize=(max(7, len(present_labels) * 1.2), max(5, len(present_labels))))
                 sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                            xticklabels=target_names, yticklabels=target_names)
+                            xticklabels=target_names, yticklabels=target_names,
+                            annot_kws={"size": 8})  # Adjust font size
                 plt.xlabel('Predicted Label')
                 plt.ylabel('True Label')
                 plt.title('Confusion Matrix (Mapped from Regression)')
                 plt.tight_layout()
                 plt.savefig(confusion_matrix_path)
-                print(f"Confusion matrix plot saved to {confusion_matrix_path}")
+                print(f"Multi-class confusion matrix plot saved to {confusion_matrix_path}")
                 plt.close()
             except Exception as e_plot:
-                print(f"Could not plot confusion matrix: {e_plot}")
-                plt.close() # Ensure plot is closed even if error occurs during plotting
+                print(f"Could not plot multi-class confusion matrix: {e_plot}")
+                plt.close()  # Ensure plot is closed even if error occurs during plotting
 
         except Exception as e:
-            print(f"Could not calculate classification metrics: {e}")
+            print(f"Could not calculate multi-class classification metrics: {e}")
             # Ensure plot is closed if an error occurred before saving/closing
-            plt.close()
+            try:
+                plt.close()
+            except:
+                pass  # Ignore if no figure is open
 
-    return final_test_loss, final_cls_acc # Return main scalar metrics
+    # --- Binary Classification Metrics (Engaged vs. Not Engaged, excluding SNP) ---
+    print("\n--- Evaluating Binary Classification (Engaged vs. Not Engaged, Excluding SNP) ---")
+    if len(all_target_classes) == 0 or len(all_pred_classes) == 0:
+        print("\nWarning: No valid classes collected. Skipping binary classification metrics.")
+    else:
+        try:
+            # Filter out SNP samples using the provided snp_index
+            non_snp_mask = (all_target_classes != snp_index)
+
+            if not np.any(non_snp_mask):
+                print("Skipping binary evaluation: No non-SNP samples found in the test set.")
+            else:
+                # Apply mask to get data excluding SNP targets
+                filtered_target_classes = all_target_classes[non_snp_mask]
+                filtered_pred_classes = all_pred_classes[non_snp_mask]
+
+                # Define mapping from original index to binary class (0: Not Engaged, 1: Engaged)
+                # Indices 0 ('Not Engaged'), 1 ('Barely Engaged') -> 0
+                # Indices 2 ('Engaged'), 3 ('Highly Engaged')   -> 1
+                # We can use np.isin for efficient mapping
+                binary_targets = np.isin(filtered_target_classes, [2, 3]).astype(int)
+                binary_preds = np.isin(filtered_pred_classes, [2, 3]).astype(int)
+
+                # Calculate binary metrics
+                final_binary_acc = accuracy_score(binary_targets, binary_preds)
+                print(f"\nTest Binary Accuracy (Engaged/Not Engaged, excluding SNP): {final_binary_acc:.4f}")
+
+                # Classification Report
+                binary_target_names = ['Not Engaged (Binary)', 'Engaged (Binary)']
+                print("\nBinary Classification Report (excluding SNP):")
+                # Use labels=[0, 1] to ensure both classes appear if expected
+                present_binary_labels = sorted(list(set(binary_targets) | set(binary_preds)))
+                report_target_names = [binary_target_names[i] for i in present_binary_labels]
+                print(classification_report(binary_targets, binary_preds, labels=present_binary_labels,
+                                            target_names=report_target_names, digits=4, zero_division=0))
+
+                # Confusion Matrix
+                print("Binary Confusion Matrix (excluding SNP):")
+                # Use labels=[0, 1] to get a consistent 2x2 matrix shape
+                binary_cm = confusion_matrix(binary_targets, binary_preds, labels=[0, 1])
+                print(binary_cm)
+
+                # Plot Binary Confusion Matrix
+                try:
+                    # Create a separate path for the binary CM plot
+                    base, ext = os.path.splitext(confusion_matrix_path)
+                    binary_cm_path = f"{base}_binary{ext}"
+
+                    plt.figure(figsize=(6, 4))  # Standard size for 2x2 matrix
+                    sns.heatmap(binary_cm, annot=True, fmt='d', cmap='Greens',  # Use a different colormap
+                                xticklabels=binary_target_names, yticklabels=binary_target_names)
+                    plt.xlabel('Predicted Label (Binary)')
+                    plt.ylabel('True Label (Binary)')
+                    plt.title('Binary Confusion Matrix (Engaged vs. Not Engaged)')
+                    plt.tight_layout()
+                    plt.savefig(binary_cm_path)
+                    print(f"Binary confusion matrix plot saved to {binary_cm_path}")
+                    plt.close()
+                except Exception as e_plot_bin:
+                    print(f"Could not plot binary confusion matrix: {e_plot_bin}")
+                    plt.close()  # Ensure plot is closed
+
+        except Exception as e_bin:
+            print(f"\n!!! ERROR during binary classification evaluation: {e_bin} !!!")
+            # Ensure plot is closed if error occurs
+            try:
+                plt.close()
+            except:
+                pass  # Ignore if no figure is open
+
+    # Return main scalar metrics including binary accuracy
+    return final_test_loss, final_cls_acc, final_binary_acc
