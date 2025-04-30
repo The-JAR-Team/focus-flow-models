@@ -12,9 +12,9 @@ INPUT_DIM = 478 * 3 # Example: (num_landmarks * coordinates) - Adjust if needed
 HIDDEN_DIM = 256
 NUM_GRU_LAYERS = 2
 DROPOUT_RATE = 0.4
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.00001
 BATCH_SIZE = 32
-NUM_EPOCHS = 1
+NUM_EPOCHS = 40
 
 # --- Saving & Loading ---
 # Base name for saved files (paths will be constructed)
