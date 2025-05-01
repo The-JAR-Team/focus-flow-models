@@ -3,7 +3,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from typing import Dict, List, Tuple
-from Model.engagement_regression_model import EngagementRegressionModel
 from Model.utils import map_score_to_class_idx
 
 
@@ -11,7 +10,7 @@ from Model.utils import map_score_to_class_idx
 # === Prediction Function ===
 # ================================================
 def predict_engagement(
-    model: EngagementRegressionModel,
+    model: nn.Module,
     data_loader: DataLoader,
     device: torch.device,
     idx_to_name_map: Dict[int, str]
@@ -20,7 +19,7 @@ def predict_engagement(
     Predicts engagement scores and mapped class names for a given data loader.
 
     Args:
-        model (EngagementRegressionModel): The trained model instance.
+        model (nn.Module): The trained model instance.
         data_loader (DataLoader): DataLoader containing the input data (expects to yield inputs first).
         device (torch.device): The device to run prediction on.
         idx_to_name_map (Dict[int, str]): Mapping from class indices to class names.

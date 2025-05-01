@@ -10,34 +10,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 import os
 from typing import Dict, Tuple, List  # Added List
 import numpy as np  # Added numpy for filtering
-
-# --- Import Model Definition ---
-# This assumes the model definition is accessible. If not, adjust the import path.
-try:
-    from Model.engagement_regression_model import EngagementRegressionModel
-except ImportError:
-    print("Warning: Could not import EngagementRegressionModel. Ensure it's in the correct path.")
-
-
-    # Define a dummy class if needed for type hinting, or remove type hint
-    class EngagementRegressionModel(nn.Module):
-        pass
-
-# --- Import Utility Functions ---
-# This assumes utils are accessible. If not, adjust the import path.
-try:
-    from Model.utils import get_targets, map_score_to_class_idx
-except ImportError:
-    print("Warning: Could not import utility functions from Model.utils.")
-
-
-    # Define dummy functions if needed
-    def get_targets(*args, **kwargs):
-        return None, None
-
-
-    def map_score_to_class_idx(*args, **kwargs):
-        return torch.tensor([])
+from Model.utils import get_targets, map_score_to_class_idx
 
 
 # ================================================
@@ -125,7 +98,7 @@ def plot_training_history(history: Dict, loss_curve_path: str, acc_curve_path: s
 # === Evaluation Function ===
 # ================================================
 def evaluate_model(
-        model: EngagementRegressionModel,
+        model: nn.Module,
         test_loader: DataLoader,
         criterion: nn.Module,
         device: torch.device,
@@ -141,7 +114,7 @@ def evaluate_model(
     Saves confusion matrix plots for both multi-class and binary evaluations.
 
     Args:
-        model (EngagementRegressionModel): The trained model instance.
+        model (nn.Module): The trained model instance.
         test_loader (DataLoader): DataLoader for the test set.
         criterion (nn.Module): The loss function (e.g., nn.MSELoss).
         device (torch.device): The device to run evaluation on.

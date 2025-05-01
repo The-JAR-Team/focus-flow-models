@@ -4,14 +4,13 @@ import onnx
 import onnxruntime
 import os
 import traceback
-from Model.engagement_regression_model import EngagementRegressionModel
 
 
 # ================================================
 # === ONNX Export Function ===
 # ================================================
 def export_to_onnx(
-    model: EngagementRegressionModel,
+    model: nn.Module,
     dummy_input: torch.Tensor,
     save_path_onnx: str,
     device: torch.device,
@@ -21,7 +20,7 @@ def export_to_onnx(
     Exports the PyTorch model to ONNX format and verifies the exported model.
 
     Args:
-        model (EngagementRegressionModel): The trained PyTorch model instance.
+        model (nn.Module): The trained PyTorch model instance.
         dummy_input (torch.Tensor): An example input tensor with the correct shape
                                     (batch_size=1, seq_len, num_landmarks, coords).
                                     Used for tracing the model.

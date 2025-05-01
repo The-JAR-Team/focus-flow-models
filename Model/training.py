@@ -7,7 +7,6 @@ from tqdm import tqdm
 import time
 import copy
 from typing import Tuple, Dict
-from Model.engagement_regression_model import EngagementRegressionModel
 from Model.utils import get_targets, map_score_to_class_idx
 
 
@@ -15,7 +14,7 @@ from Model.utils import get_targets, map_score_to_class_idx
 # === Training Function ===
 # ================================================
 def train_model(
-    model: EngagementRegressionModel,
+    model: nn.Module,
     train_loader: DataLoader,
     val_loader: DataLoader,
     criterion: nn.Module,
@@ -26,12 +25,12 @@ def train_model(
     save_best_pth: bool,
     label_to_idx_map: Dict[str, int], # Pass maps explicitly
     idx_to_score_map: Dict[int, float]  # Pass maps explicitly
-    ) -> Tuple[EngagementRegressionModel, Dict]:
+    ) -> Tuple[nn.Module, Dict]:
     """
     Trains the regression model, optionally saving the best .pth state based on validation loss.
 
     Args:
-        model (EngagementRegressionModel): The model instance to train.
+        model (nn.Module): The model instance to train.
         train_loader (DataLoader): DataLoader for the training set.
         val_loader (DataLoader): DataLoader for the validation set.
         criterion (nn.Module): The loss function (e.g., nn.MSELoss).
@@ -45,7 +44,7 @@ def train_model(
 
 
     Returns:
-        Tuple[EngagementRegressionModel, Dict]: A tuple containing:
+        Tuple[nn.Module, Dict]: A tuple containing:
             - final_model (EngagementRegressionModel): The model with the best loaded weights (or last epoch's weights).
             - history (Dict): A dictionary containing training and validation loss/accuracy history.
     """
