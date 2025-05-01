@@ -1,5 +1,7 @@
 import os
 import torch
+import torch.nn as nn
+from Model.models.gru_model import GruModel
 
 # ================================================
 # === Configuration ===
@@ -8,10 +10,6 @@ CONFIG_PATH = "./Preprocess/Pipeline/Pipelines/configs/ENGAGENET_10fps_quality95
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # --- Model & Training Hyperparameters ---
-INPUT_DIM = 478 * 3 # Example: (num_landmarks * coordinates) - Adjust if needed
-HIDDEN_DIM = 256
-NUM_GRU_LAYERS = 2
-DROPOUT_RATE = 0.4
 LEARNING_RATE = 0.00001
 BATCH_SIZE = 32
 NUM_EPOCHS = 1
@@ -29,8 +27,8 @@ ACC_CURVE_PATH = os.path.join(SAVE_DIR, "mapped_accuracy_curve.png")
 CONFUSION_MATRIX_PATH = os.path.join(SAVE_DIR, "confusion_matrix_regression_mapped.png")
 
 
-SAVE_BEST_MODEL_PTH = True # Save best model state dict during training?
-SAVE_FINAL_MODEL_ONNX = True # Save the final best model as ONNX after training?
+SAVE_BEST_MODEL_PTH = False # Save best model state dict during training?
+SAVE_FINAL_MODEL_ONNX = False # Save the final best model as ONNX after training?
 LOAD_SAVED_STATE = True # Attempt to load MODEL_SAVE_PATH_PTH before training?
 
 # --- Mappings ---
@@ -47,13 +45,23 @@ IDX_TO_NAME_MAP = {0: 'Not Engaged', 1: 'Barely Engaged', 2: 'Engaged', 3: 'High
 # --- ONNX Export Settings ---
 ONNX_OPSET_VERSION = 11
 
+
+def get_model():
+    """
+    Returns the model class for engagement regression.
+
+    Returns:
+        GruModel: The GRU-based model for engagement regression.
+    """
+    return GruModel()
+
+
 # --- Print Configuration Function ---
 def print_config():
     """Prints the configuration settings."""
     print("--- Configuration ---")
     print(f"Device: {DEVICE}")
     print(f"Config Path: {CONFIG_PATH}")
-    print(f"Input Dim: {INPUT_DIM}")
     print(f"Load Saved State: {LOAD_SAVED_STATE}")
     print(f"Save Best PyTorch Model (.pth): {SAVE_BEST_MODEL_PTH}")
     if SAVE_BEST_MODEL_PTH or LOAD_SAVED_STATE:

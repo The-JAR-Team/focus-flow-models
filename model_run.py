@@ -8,9 +8,6 @@ import time
 # --- Import Configuration ---
 import Model.model_config as config
 
-# --- Import Model Definition ---
-from Model.engagement_regression_model import EngagementRegressionModel
-
 # --- Import Functions ---
 from Model.utils import get_targets # Only need get_targets here if used directly, otherwise handled within modules
 from Model.training import train_model
@@ -103,14 +100,7 @@ if __name__ == "__main__":
     print("\nInitializing model...")
     try:
         # Instantiate model definition using configured INPUT_DIM
-        model_instance = EngagementRegressionModel(
-            input_dim=config.INPUT_DIM,
-            hidden_dim=config.HIDDEN_DIM,
-            output_dim=1, # Regression output
-            num_layers=config.NUM_GRU_LAYERS,
-            dropout=config.DROPOUT_RATE,
-            bidirectional=True # Assuming bidirectional based on original code
-        ).to(config.DEVICE)
+        model_instance = config.get_model()
 
         # Attempt to load saved state if requested
         if config.LOAD_SAVED_STATE:
@@ -132,6 +122,8 @@ if __name__ == "__main__":
         if model is None:
             print("Using newly initialized model.")
             model = model_instance
+
+        model.to(config.DEVICE)
 
         # --- Initialize Optimizer and Loss ---
         # Using Mean Squared Error for regression

@@ -1,13 +1,19 @@
 import torch
 import torch.nn as nn
 
+INPUT_DIM = 478 * 3 # Example: (num_landmarks * coordinates) - Adjust if needed
+HIDDEN_DIM = 256
+NUM_GRU_LAYERS = 2
+DROPOUT_RATE = 0.4
+
 
 # ================================================
 # === Model Definition ===
 # ================================================
-class EngagementRegressionModel(nn.Module):
+class GruModel(nn.Module):
     """ GRU-based model for engagement regression. """
-    def __init__(self, input_dim, hidden_dim, output_dim=1, num_layers=2, dropout=0.5, bidirectional=True):
+    def __init__(self, input_dim=INPUT_DIM, hidden_dim=HIDDEN_DIM, output_dim=1, num_layers=NUM_GRU_LAYERS,
+                 dropout=DROPOUT_RATE, bidirectional=True):
         """
         Initializes the EngagementRegressionModel.
 
@@ -100,7 +106,7 @@ if __name__ == '__main__':
     # Use example dimensions (replace with actual values from config if needed)
     example_input_dim = 478 * 3
     example_hidden_dim = 256
-    model = EngagementRegressionModel(input_dim=example_input_dim, hidden_dim=example_hidden_dim)
+    model = GruModel(input_dim=example_input_dim, hidden_dim=example_hidden_dim)
     print(model)
 
     # Example forward pass with dummy data
