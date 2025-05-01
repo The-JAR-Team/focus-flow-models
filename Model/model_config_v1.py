@@ -14,11 +14,15 @@ INPUT_DIM = 478 * 3 # Example: (num_landmarks * coordinates) - Adjust if needed
 LEARNING_RATE = 0.00001
 BATCH_SIZE = 32
 NUM_EPOCHS = 1
+CRITERION = nn.MSELoss()
+OPTIMIZER = torch.optim.AdamW
+MODEL = GruModel()
 
 # --- Saving & Loading ---
 # Base name for saved files (paths will be constructed)
 MODEL_BASE_NAME = "v1"
 SAVE_DIR = f"./saved_models/{MODEL_BASE_NAME}/" # Directory to save models and plots
+
 
 # Construct full paths
 MODEL_SAVE_PATH_PTH = os.path.join(SAVE_DIR, f"{MODEL_BASE_NAME}.pth")
@@ -45,16 +49,6 @@ IDX_TO_NAME_MAP = {0: 'Not Engaged', 1: 'Barely Engaged', 2: 'Engaged', 3: 'High
 
 # --- ONNX Export Settings ---
 ONNX_OPSET_VERSION = 11
-
-
-def get_model():
-    """
-    Returns the model class for engagement regression.
-
-    Returns:
-        GruModel: The GRU-based model for engagement regression.
-    """
-    return GruModel()
 
 
 # --- Print Configuration Function ---

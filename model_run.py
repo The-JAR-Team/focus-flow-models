@@ -104,7 +104,7 @@ if __name__ == "__main__":
     print("\nInitializing model...")
     try:
         # Instantiate model definition using configured INPUT_DIM
-        model_instance = config.get_model()
+        model_instance = config.MODEL
 
         # Attempt to load saved state if requested
         if config.LOAD_SAVED_STATE:
@@ -131,9 +131,9 @@ if __name__ == "__main__":
 
         # --- Initialize Optimizer and Loss ---
         # Using Mean Squared Error for regression
-        criterion = nn.SmoothL1Loss()
+        criterion = config.CRITERION
         # Using AdamW optimizer
-        optimizer = optim.AdamW(model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+        optimizer = config.OPTIMIZER(model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
 
         print("\nModel Summary:")
         print(model)
