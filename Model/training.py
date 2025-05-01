@@ -49,6 +49,7 @@ def train_model(
             - history (Dict): A dictionary containing training and validation loss/accuracy history.
     """
     best_val_loss = float('inf')
+    best_val_acc_mapped = 0.0
     best_model_state_dict = None # Store best state in memory if saving to file is disabled or fails
     history = {'train_loss': [], 'val_loss': [], 'val_accuracy_mapped': []}
 
@@ -136,11 +137,9 @@ def train_model(
                 val_loss += loss.item() * batch_size
 
                 # Calculate Mapped Accuracy
-                pred_classes = map_score_to_class_idx(pred_scores) # Map scores to classes
-                # Compare mapped predictions to original target class indices (on the same device)
-                # .squeeze() handles cases where pred_classes might be [batch, 1]
+                pred_classes = map_score_to_class_idx(pred_scores, idx_to_score_map)
                 val_corrects_mapped += torch.sum(pred_classes.squeeze() == target_indices.squeeze())
-                total_val_valid_samples_acc += batch_size # Count all valid samples for accuracy average
+                total_val_valid_samples_acc += batch_size
 
         # Calculate average validation loss and accuracy for the epoch
         epoch_val_loss = val_loss / total_val_samples if total_val_samples > 0 else float('inf')
@@ -158,9 +157,12 @@ def train_model(
         print(f"    Val Acc (map):{epoch_val_acc_mapped:.4f}")
 
         # --- Save Best Model Check ---
-        if epoch_val_loss < best_val_loss:
-            best_val_loss = epoch_val_loss
-            print(f"    * New best Val Loss: {best_val_loss:.6f}. ", end="")
+        if epoch_val_acc_mapped > best_val_acc_mapped:
+        # if epoch_val_loss < best_val_loss:
+            best_val_acc_mapped = epoch_val_acc_mapped
+            # best_val_loss = epoch_val_loss
+            print(f"    * New best Val Acc: {best_val_acc_mapped:.6f}. ", end="")
+            # print(f"    * New best Val Loss: {best_val_loss:.6f}. ", end="")
             if save_best_pth:
                 try:
                     # Save only the model's state dictionary
@@ -182,6 +184,7 @@ def train_model(
     print('\n--- Training Finished ---')
     print(f"Total Training Time: {(end_train_time - start_train_time):.2f}s")
     print(f"Best Validation Loss achieved: {best_val_loss:.6f}")
+    print(f"Best Validation Acc achieved: {best_val_acc_mapped:.6f}")
 
     # --- Load Best State into the final model ---
     final_model = model # Start with the model from the last epoch

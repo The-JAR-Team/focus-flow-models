@@ -173,14 +173,12 @@ def evaluate_model(
 
             # Map predictions to classes
             # Ensure map_score_to_class_idx returns integer indices directly
-            pred_classes = map_score_to_class_idx(pred_scores)  # Expects (batch_size) tensor of indices
+            pred_classes = map_score_to_class_idx(pred_scores, idx_to_score_map)
 
-            # Collect scores and classes (move predictions to CPU)
             all_pred_scores_list.extend(pred_scores.squeeze().cpu().tolist())
             all_target_scores_list.extend(target_scores.squeeze().cpu().tolist())
-            # Ensure pred_classes and target_indices are 1D lists of integers
             all_pred_classes_list.extend(pred_classes.squeeze().cpu().tolist())
-            all_target_classes_list.extend(target_indices.cpu().tolist())  # Already on CPU
+            all_target_classes_list.extend(target_indices.cpu().tolist())
 
     # Convert lists to numpy arrays for easier handling
     all_pred_scores = np.array(all_pred_scores_list)

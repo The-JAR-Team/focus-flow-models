@@ -9,7 +9,7 @@ import time
 import Model.model_config as config
 
 # --- Import Functions ---
-from Model.utils import get_targets # Only need get_targets here if used directly, otherwise handled within modules
+from Model.utils import get_targets  # Only need get_targets here if used directly, otherwise handled within modules
 from Model.training import train_model
 from Model.evaluation import evaluate_model, plot_training_history
 from Model.onnx_export import export_to_onnx
@@ -24,7 +24,6 @@ except ImportError:
     print("       Please ensure the necessary preprocessing modules are accessible.")
     exit()
 
-
 # ================================================
 # === Main Execution ===
 # ================================================
@@ -33,7 +32,7 @@ if __name__ == "__main__":
     print("--- Starting Engagement Prediction Script ---")
 
     # --- Print Configuration ---
-    config.print_config() # Print settings from config.py
+    config.print_config()  # Print settings from config.py
 
     # --- Create Save Directory ---
     os.makedirs(config.SAVE_DIR, exist_ok=True)
@@ -56,37 +55,42 @@ if __name__ == "__main__":
         try:
             sample_inputs, _ = next(iter(train_loader))
             if isinstance(sample_inputs, torch.Tensor) and sample_inputs.ndim == 4:
-                 SEQ_LEN = sample_inputs.shape[1]
-                 NUM_LANDMARKS = sample_inputs.shape[2]
-                 NUM_COORDS = sample_inputs.shape[3]
-                 ACTUAL_INPUT_DIM = NUM_LANDMARKS * NUM_COORDS
-                 print(f"  Inferred from data: Seq Len={SEQ_LEN}, Landmarks={NUM_LANDMARKS}, Coords={NUM_COORDS} (Input Dim={ACTUAL_INPUT_DIM})")
-                 # Optional: Check consistency with configured INPUT_DIM
-                 if ACTUAL_INPUT_DIM != config.INPUT_DIM:
-                     print(f"  Warning: Inferred input dim ({ACTUAL_INPUT_DIM}) differs from configured INPUT_DIM ({config.INPUT_DIM}).")
-                     print(f"           Using configured INPUT_DIM ({config.INPUT_DIM}) for model initialization.")
-                     print(f"           Using inferred shape ({SEQ_LEN}, {NUM_LANDMARKS}, {NUM_COORDS}) for ONNX dummy input.")
+                SEQ_LEN = sample_inputs.shape[1]
+                NUM_LANDMARKS = sample_inputs.shape[2]
+                NUM_COORDS = sample_inputs.shape[3]
+                ACTUAL_INPUT_DIM = NUM_LANDMARKS * NUM_COORDS
+                print(
+                    f"  Inferred from data: Seq Len={SEQ_LEN}, Landmarks={NUM_LANDMARKS}, Coords={NUM_COORDS} (Input Dim={ACTUAL_INPUT_DIM})")
+                # Optional: Check consistency with configured INPUT_DIM
+                if ACTUAL_INPUT_DIM != config.INPUT_DIM:
+                    print(
+                        f"  Warning: Inferred input dim ({ACTUAL_INPUT_DIM}) differs from configured INPUT_DIM ({config.INPUT_DIM}).")
+                    print(f"           Using configured INPUT_DIM ({config.INPUT_DIM}) for model initialization.")
+                    print(
+                        f"           Using inferred shape ({SEQ_LEN}, {NUM_LANDMARKS}, {NUM_COORDS}) for ONNX dummy input.")
             else:
                 # Handle cases where the data might not be as expected
-                raise ValueError(f"Could not infer input shape. Expected 4D tensor, got {sample_inputs.ndim}D tensor of type {type(sample_inputs)}.")
+                raise ValueError(
+                    f"Could not infer input shape. Expected 4D tensor, got {sample_inputs.ndim}D tensor of type {type(sample_inputs)}.")
         except StopIteration:
-             raise ValueError("Training dataloader is empty, cannot infer shape.")
+            raise ValueError("Training dataloader is empty, cannot infer shape.")
         except Exception as e_infer:
-             print(f"  Warning: Could not infer input shape from data ({e_infer}).")
-             # Attempt to use placeholder values ONLY if inference failed and shape is needed
-             if config.SAVE_FINAL_MODEL_ONNX and (SEQ_LEN is None or NUM_LANDMARKS is None or NUM_COORDS is None):
-                 print("  Attempting to use placeholder values for ONNX export shape.")
-                 SEQ_LEN = 30 # Example placeholder sequence length
-                 # Try to derive landmarks/coords from INPUT_DIM assuming 3 coords
-                 if config.INPUT_DIM % 3 == 0:
-                     NUM_LANDMARKS = config.INPUT_DIM // 3
-                     NUM_COORDS = 3
-                     print(f"  Using placeholders: Seq Len={SEQ_LEN}, Landmarks={NUM_LANDMARKS}, Coords={NUM_COORDS}")
-                 else:
-                      # Cannot determine shape, ONNX export will likely fail later
-                      print(f"  ERROR: Cannot determine placeholder shape for ONNX export from INPUT_DIM={config.INPUT_DIM}.")
-                      # Set flags to prevent ONNX export attempt later if shape is unknown
-                      SEQ_LEN, NUM_LANDMARKS, NUM_COORDS = None, None, None
+            print(f"  Warning: Could not infer input shape from data ({e_infer}).")
+            # Attempt to use placeholder values ONLY if inference failed and shape is needed
+            if config.SAVE_FINAL_MODEL_ONNX and (SEQ_LEN is None or NUM_LANDMARKS is None or NUM_COORDS is None):
+                print("  Attempting to use placeholder values for ONNX export shape.")
+                SEQ_LEN = 30  # Example placeholder sequence length
+                # Try to derive landmarks/coords from INPUT_DIM assuming 3 coords
+                if config.INPUT_DIM % 3 == 0:
+                    NUM_LANDMARKS = config.INPUT_DIM // 3
+                    NUM_COORDS = 3
+                    print(f"  Using placeholders: Seq Len={SEQ_LEN}, Landmarks={NUM_LANDMARKS}, Coords={NUM_COORDS}")
+                else:
+                    # Cannot determine shape, ONNX export will likely fail later
+                    print(
+                        f"  ERROR: Cannot determine placeholder shape for ONNX export from INPUT_DIM={config.INPUT_DIM}.")
+                    # Set flags to prevent ONNX export attempt later if shape is unknown
+                    SEQ_LEN, NUM_LANDMARKS, NUM_COORDS = None, None, None
 
 
     except Exception as e:
@@ -109,7 +113,7 @@ if __name__ == "__main__":
                 try:
                     # Load state dict into the instantiated model
                     model_instance.load_state_dict(torch.load(config.MODEL_SAVE_PATH_PTH, map_location=config.DEVICE))
-                    model = model_instance # Assign loaded model
+                    model = model_instance  # Assign loaded model
                     print("Model state loaded successfully.")
                 except Exception as e:
                     print(f"Warning: Failed to load state dict from {config.MODEL_SAVE_PATH_PTH}: {e}")
@@ -129,7 +133,7 @@ if __name__ == "__main__":
         # Using Mean Squared Error for regression
         criterion = nn.MSELoss()
         # Using AdamW optimizer
-        optimizer = optim.AdamW(model.parameters(), lr=config.LEARNING_RATE)
+        optimizer = optim.AdamW(model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
 
         print("\nModel Summary:")
         print(model)
@@ -146,10 +150,10 @@ if __name__ == "__main__":
     history = None
     # Decide whether to train based on LOAD_SAVED_STATE or other flags if needed
     # Currently, it trains even if a state is loaded. Add logic here to skip if desired.
-    skip_training = False # Example flag, set based on LOAD_SAVED_STATE if needed
+    skip_training = False  # Example flag, set based on LOAD_SAVED_STATE if needed
     if skip_training:
-         print("\nSkipping training as requested or due to loaded state.")
-         trained_model = model # Use the loaded/initialized model
+        print("\nSkipping training as requested or due to loaded state.")
+        trained_model = model  # Use the loaded/initialized model
     else:
         print("\nStarting model training process...")
         try:
@@ -164,15 +168,15 @@ if __name__ == "__main__":
                 device=config.DEVICE,
                 save_path_pth=config.MODEL_SAVE_PATH_PTH,
                 save_best_pth=config.SAVE_BEST_MODEL_PTH,
-                label_to_idx_map=config.LABEL_TO_IDX_MAP, # Pass necessary maps
+                label_to_idx_map=config.LABEL_TO_IDX_MAP,  # Pass necessary maps
                 idx_to_score_map=config.IDX_TO_SCORE_MAP
             )
         except KeyboardInterrupt:
-             print("\n--- Training interrupted by user ---")
-             # Use the model state at interruption (best saved might be loaded by train_model)
-             trained_model = model
-             history = None # History might be incomplete
-             print("Proceeding with model state at interruption.")
+            print("\n--- Training interrupted by user ---")
+            # Use the model state at interruption (best saved might be loaded by train_model)
+            trained_model = model
+            history = None  # History might be incomplete
+            print("Proceeding with model state at interruption.")
         except Exception as e:
             print(f"\n!!! ERROR during training: {e} !!!")
             traceback.print_exc()
@@ -184,12 +188,11 @@ if __name__ == "__main__":
                     trained_model = model
                     print("Successfully loaded best saved model.")
                 except Exception as le:
-                     print(f"Could not load best saved model: {le}. No trained model available.")
-                     trained_model = None
+                    print(f"Could not load best saved model: {le}. No trained model available.")
+                    trained_model = None
             else:
-                trained_model = None # No trained model available
-            history = None # History is likely invalid
-
+                trained_model = None  # No trained model available
+            history = None  # History is likely invalid
 
     # --- Plot Training History ---
     if history:
@@ -201,7 +204,7 @@ if __name__ == "__main__":
                 acc_curve_path=config.ACC_CURVE_PATH
             )
         except Exception as e:
-             print(f"Error plotting history: {e}")
+            print(f"Error plotting history: {e}")
     else:
         print("\nSkipping history plotting: No history data available.")
 
@@ -228,9 +231,8 @@ if __name__ == "__main__":
             traceback.print_exc()
     elif not trained_model:
         print("\nSkipping evaluation: No valid trained model available.")
-    else: # trained_model exists but test_loader doesn't
-         print("\nSkipping evaluation: Test loader not available.")
-
+    else:  # trained_model exists but test_loader doesn't
+        print("\nSkipping evaluation: Test loader not available.")
 
     # --- Export to ONNX ---
     if trained_model and config.SAVE_FINAL_MODEL_ONNX:
@@ -245,7 +247,7 @@ if __name__ == "__main__":
                     model=trained_model,
                     dummy_input=dummy_input,
                     save_path_onnx=config.MODEL_SAVE_PATH_ONNX,
-                    device=config.DEVICE, # Export will move model/input to this device
+                    device=config.DEVICE,  # Export will move model/input to this device
                     opset_version=config.ONNX_OPSET_VERSION
                 )
             except Exception as e:
@@ -253,35 +255,35 @@ if __name__ == "__main__":
                 print(f"\n!!! ERROR during ONNX export preparation or execution: {e} !!!")
                 traceback.print_exc()
         else:
-             # This case occurs if shape inference failed and placeholders couldn't be determined
-             print("\n!!! ERROR during ONNX export: Could not determine input shape for dummy input. Export skipped. !!!")
-             print("   Check dataloader and shape inference steps in the loading section.")
+            # This case occurs if shape inference failed and placeholders couldn't be determined
+            print(
+                "\n!!! ERROR during ONNX export: Could not determine input shape for dummy input. Export skipped. !!!")
+            print("   Check dataloader and shape inference steps in the loading section.")
 
     elif not trained_model:
-         print("\nSkipping ONNX export: No valid trained model.")
+        print("\nSkipping ONNX export: No valid trained model.")
     elif not config.SAVE_FINAL_MODEL_ONNX:
         print("\nSkipping ONNX export: Saving disabled in configuration.")
 
     run_prediction_example = False
     if run_prediction_example and trained_model and test_loader:
-         print("\nRunning prediction example on test set...")
-         try:
-             # Call the prediction function from predict.py
-             predict_engagement(
-                 model=trained_model,
-                 data_loader=test_loader,
-                 device=config.DEVICE,
-                 idx_to_name_map=config.IDX_TO_NAME_MAP
-             )
-         except Exception as e:
-             print(f"\n!!! ERROR during prediction example: {e} !!!")
-             traceback.print_exc()
+        print("\nRunning prediction example on test set...")
+        try:
+            # Call the prediction function from predict.py
+            predict_engagement(
+                model=trained_model,
+                data_loader=test_loader,
+                device=config.DEVICE,
+                idx_to_name_map=config.IDX_TO_NAME_MAP,
+                idx_to_score_map=config.IDX_TO_SCORE_MAP  # Pass the score map
+            )
+        except Exception as e:
+            print(f"\n!!! ERROR during prediction example: {e} !!!")
+            traceback.print_exc()
     elif run_prediction_example:
         print("\nSkipping prediction example: Model or test loader not available.")
-
 
     overall_end_time = time.time()
     print("\n--- Script Finished ---")
     print(f"Total script execution time: {(overall_end_time - overall_start_time):.2f}s")
 # ================================================
-
