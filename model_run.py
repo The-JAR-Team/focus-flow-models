@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
         # --- Initialize Optimizer and Loss ---
         # Using Mean Squared Error for regression
-        criterion = nn.MSELoss()
+        criterion = nn.SmoothL1Loss()
         # Using AdamW optimizer
         optimizer = optim.AdamW(model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
 
