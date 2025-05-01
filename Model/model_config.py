@@ -24,7 +24,7 @@ OPTIMIZER = torch.optim.AdamW
 MODEL = GruAttentionModel()
 
 # --- Saving & Loading ---
-MODEL_BASE_NAME = "v4_gru_attention" # New version name
+MODEL_BASE_NAME = "v3_gru_attention" # New version name
 SAVE_DIR = f"./saved_models/{MODEL_BASE_NAME}/"
 
 # Construct full paths
