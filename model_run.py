@@ -134,7 +134,9 @@ if __name__ == "__main__":
         # Using Mean Squared Error for regression
         criterion = config.CRITERION
         # Using AdamW optimizer
-        optimizer = config.OPTIMIZER(model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+        optimizer = config.OPTIMIZER_CLASS(model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+
+        scheduler = config.get_lr_scheduler(optimizer)
 
         print("\nModel Summary:")
         print(model)
@@ -165,6 +167,7 @@ if __name__ == "__main__":
                 val_loader=val_loader,
                 criterion=criterion,
                 optimizer=optimizer,
+                scheduler=scheduler,
                 num_epochs=config.NUM_EPOCHS,
                 device=config.DEVICE,
                 save_path_pth=config.MODEL_SAVE_PATH_PTH,
@@ -202,7 +205,8 @@ if __name__ == "__main__":
             plot_training_history(
                 history=history,
                 loss_curve_path=config.LOSS_CURVE_PATH,
-                acc_curve_path=config.ACC_CURVE_PATH
+                acc_curve_path=config.ACC_CURVE_PATH,
+                lr_curve_path=config.LR_CURVE_PATH,
             )
         except Exception as e:
             print(f"Error plotting history: {e}")

@@ -3,6 +3,8 @@
 import os
 import torch
 import torch.nn as nn
+import torch.optim.lr_scheduler as lr_scheduler
+from torch import optim
 
 from Model.mesh_flipmap import mesh_annotations_derived_flip_map
 # --- Import the NEW GRU Attention model ---
@@ -20,13 +22,25 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # --- Model & Training Hyperparameters ---
 # Start with similar params as the successful simplified LSTM run
 INPUT_DIM = 478 * 3 # Example: (num_landmarks * coordinates) - Adjust if needed
-LEARNING_RATE = 0.00005
+LEARNING_RATE = 0.0001
 BATCH_SIZE = 32
-NUM_EPOCHS = 10
+NUM_EPOCHS = 100
 WEIGHT_DECAY = 1e-4
 CRITERION = nn.MSELoss()
-OPTIMIZER = torch.optim.AdamW
+OPTIMIZER_CLASS = torch.optim.AdamW
 MODEL = GruAttentionModel()
+
+LR_SCHEDULER_TYPE = "StepLR"  # Or "ReduceLROnPlateau" or None
+
+# Parameters for StepLR
+STEP_LR_STEP_SIZE = 30
+STEP_LR_GAMMA = 0.1
+
+# Parameters for ReduceLROnPlateau
+REDUCE_LR_PATIENCE = 10
+REDUCE_LR_FACTOR = 0.1
+REDUCE_LR_MIN_LR = 1e-6
+REDUCE_LR_VERBOSE = True
 
 # --- Saving & Loading ---
 MODEL_BASE_NAME = "v3_gru_attention" # New version name
@@ -38,6 +52,8 @@ MODEL_SAVE_PATH_ONNX = os.path.join(SAVE_DIR, f"{MODEL_BASE_NAME}.onnx")
 LOSS_CURVE_PATH = os.path.join(SAVE_DIR, "loss_curves.png")
 ACC_CURVE_PATH = os.path.join(SAVE_DIR, "mapped_accuracy_curve.png")
 CONFUSION_MATRIX_PATH = os.path.join(SAVE_DIR, "confusion_matrix_regression_mapped.png")
+LR_CURVE_PATH = os.path.join(SAVE_DIR, "learning_rate_curve.png")
+
 
 SAVE_BEST_MODEL_PTH = True
 SAVE_FINAL_MODEL_ONNX = True
@@ -82,6 +98,35 @@ IDX_TO_NAME_MAP = {0: 'Not Engaged', 1: 'Barely Engaged', 2: 'Engaged', 3: 'High
 
 # --- ONNX Export Settings ---
 ONNX_OPSET_VERSION = 11 # Usually fine, adjust if export errors occur
+
+
+def get_lr_scheduler(optimizer_instance: optim.Optimizer):
+    """
+    Initializes and returns the learning rate scheduler based on config.
+    Args:
+        optimizer_instance: The instantiated optimizer.
+    Returns:
+        A learning rate scheduler instance or None.
+    """
+    if LR_SCHEDULER_TYPE == "StepLR":
+        print(f"Initializing StepLR scheduler with step_size={STEP_LR_STEP_SIZE}, gamma={STEP_LR_GAMMA}")
+        return lr_scheduler.StepLR(optimizer_instance,
+                                   step_size=STEP_LR_STEP_SIZE,
+                                   gamma=STEP_LR_GAMMA)
+    elif LR_SCHEDULER_TYPE == "ReduceLROnPlateau":
+        print(f"Initializing ReduceLROnPlateau scheduler with factor={REDUCE_LR_FACTOR}, patience={REDUCE_LR_PATIENCE}")
+        return lr_scheduler.ReduceLROnPlateau(optimizer_instance,
+                                              mode='min',
+                                              factor=REDUCE_LR_FACTOR,
+                                              patience=REDUCE_LR_PATIENCE,
+                                              min_lr=REDUCE_LR_MIN_LR,
+                                              verbose=REDUCE_LR_VERBOSE)
+    elif LR_SCHEDULER_TYPE is None:
+        print("No LR scheduler will be used.")
+        return None
+    else:
+        print(f"Warning: Unknown LR_SCHEDULER_TYPE: {LR_SCHEDULER_TYPE}. No scheduler will be used.")
+        return None
 
 
 # --- Print Configuration Function ---

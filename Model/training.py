@@ -1,4 +1,6 @@
 import os
+import typing
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -19,6 +21,7 @@ def train_model(
     val_loader: DataLoader,
     criterion: nn.Module,
     optimizer: optim.Optimizer,
+    scheduler: typing.Optional[torch.optim.lr_scheduler._LRScheduler],
     num_epochs: int,
     device: torch.device,
     save_path_pth: str,
@@ -35,6 +38,7 @@ def train_model(
         val_loader (DataLoader): DataLoader for the validation set.
         criterion (nn.Module): The loss function (e.g., nn.MSELoss).
         optimizer (optim.Optimizer): The optimizer (e.g., AdamW).
+        scheduler (torch.optim.lr_scheduler._LRScheduler): The learning rate scheduler.
         num_epochs (int): The total number of epochs to train for.
         device (torch.device): The device to train on (e.g., 'cuda' or 'cpu').
         save_path_pth (str): Path to save the best PyTorch model state dictionary.
@@ -51,7 +55,7 @@ def train_model(
     best_val_loss = float('inf')
     best_val_acc_mapped = 0.0
     best_model_state_dict = None # Store best state in memory if saving to file is disabled or fails
-    history = {'train_loss': [], 'val_loss': [], 'val_accuracy_mapped': []}
+    history = {'train_loss': [], 'val_loss': [], 'val_accuracy_mapped': [], 'lr': []}
 
     print("\n--- Starting Training (Regression [0, 1]) ---")
     if save_best_pth:
@@ -148,6 +152,18 @@ def train_model(
         history['val_loss'].append(epoch_val_loss)
         history['val_accuracy_mapped'].append(epoch_val_acc_mapped.item()) # Store accuracy as float
 
+        if scheduler:  # Check if a scheduler is provided
+            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(epoch_val_loss)
+                # Optional: Log the LR
+                current_lr = optimizer.param_groups[0]['lr']
+                print(f"    LR after scheduler step: {current_lr:.7f}")
+            else:
+                scheduler.step()
+
+        current_lr = optimizer.param_groups[0]['lr']
+        history['lr'].append(current_lr)
+
         epoch_end_time = time.time()
         # --- Print Epoch Summary ---
         print(f"  Epoch {epoch+1} Summary:")
@@ -155,6 +171,7 @@ def train_model(
         print(f"    Train Loss:   {epoch_train_loss:.6f}") # More precision for loss
         print(f"    Val Loss:     {epoch_val_loss:.6f}")
         print(f"    Val Acc (map):{epoch_val_acc_mapped:.4f}")
+        print(f"    Current LR:   {current_lr:.7f}")
 
         # --- Save Best Model Check ---
         if epoch_val_acc_mapped > best_val_acc_mapped:

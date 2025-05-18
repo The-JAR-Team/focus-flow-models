@@ -16,7 +16,7 @@ from Model.utils import get_targets, map_score_to_class_idx
 # ================================================
 # === Plotting Function ===
 # ================================================
-def plot_training_history(history: Dict, loss_curve_path: str, acc_curve_path: str):
+def plot_training_history(history: Dict, loss_curve_path: str, acc_curve_path: str, lr_curve_path: str):
     """
     Plots training/validation loss and mapped accuracy curves. Saves the plots to specified paths.
 
@@ -25,6 +25,7 @@ def plot_training_history(history: Dict, loss_curve_path: str, acc_curve_path: s
                         (expects 'train_loss', 'val_loss', 'val_accuracy_mapped').
         loss_curve_path (str): Path to save the loss curves plot.
         acc_curve_path (str): Path to save the accuracy curve plot.
+        lr_curve_path (str): Path to save the learning rate curve plot.
     """
     # Check if history data is sufficient
     if not history or not history.get('train_loss') or not history.get('val_loss'):
@@ -92,6 +93,26 @@ def plot_training_history(history: Dict, loss_curve_path: str, acc_curve_path: s
             plt.close()
     else:
         print("Skipping mapped accuracy plot: 'val_accuracy_mapped' not found in history.")
+
+    # --- Learning Rate Plot ---
+    if 'lr' in history and history['lr']:
+        try:
+            plt.figure(figsize=(7, 5))  # You can adjust the figure size
+            plt.plot(epochs, history['lr'], 'go-', label='Learning Rate')  # 'go-' is green line with circles
+            plt.title('Learning Rate Over Epochs')
+            plt.xlabel('Epochs')
+            plt.ylabel('Learning Rate')
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(lr_curve_path)
+            print(f"Learning rate curve plot saved to {lr_curve_path}")
+            plt.close()
+        except Exception as e:
+            print(f"Error plotting learning rate curve: {e}")
+            plt.close()
+    else:
+        print("Skipping learning rate plot: 'lr' not found in history or is empty.")
 
 
 # ================================================
