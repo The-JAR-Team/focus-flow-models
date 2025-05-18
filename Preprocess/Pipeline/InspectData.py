@@ -9,6 +9,8 @@ from tqdm import tqdm
 from typing import Optional, Dict, Any, List
 import textwrap
 
+from Preprocess.Pipeline import OrchestrationPipeline
+
 # --- Import Tabulate ---
 try:
     from tabulate import tabulate
@@ -68,7 +70,7 @@ def collate_wrapper(batch):
 
 # === Reusable DataLoader Creation Function ===
 # (No changes needed here)
-def get_dataloader(config_path: str, dataset_type: str, batch_size_override: Optional[int] = None, num_workers_override: Optional[int] = None, shuffle=False) -> Optional[DataLoader]:
+def get_dataloader(config_path: str, dataset_type: str, batch_size_override: Optional[int] = None, num_workers_override: Optional[int] = None, shuffle=False, transform_pipeline: Optional[OrchestrationPipeline] = None) -> Optional[DataLoader]:
     if CACHE_DIR is None: print("Error [get_dataloader]: CACHE_DIR not available."); return None
     if not os.path.exists(config_path): print(f"Error [get_dataloader]: Config not found: '{config_path}'"); return None
     try:
@@ -85,7 +87,7 @@ def get_dataloader(config_path: str, dataset_type: str, batch_size_override: Opt
     data_dir = os.path.join(cache_root, "PipelineResult", config_name, pipeline_version, dataset_type)
     if not os.path.isdir(data_dir): print(f"Warning [get_dataloader]: Data dir not found: {data_dir}."); return None
     try:
-        dataset = CachedTensorDataset(data_dir)
+        dataset = CachedTensorDataset(data_dir, transform_pipeline=transform_pipeline, verbose_dataset=False)
         if len(dataset) == 0: print(f"Warning [get_dataloader]: No samples found in {data_dir}."); return None
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers,
                             pin_memory=pin_memory_effective, collate_fn=collate_wrapper, persistent_workers=True if num_workers > 0 else False)

@@ -14,6 +14,8 @@ from Model.training import train_model
 from Model.evaluation import evaluate_model, plot_training_history
 from Model.onnx_export import export_to_onnx
 from Model.predict import predict_engagement
+from Preprocess.Pipeline.OrchestrationPipeline import OrchestrationPipeline
+from Preprocess.Pipeline.Stages.dataloader_stages.DistanceNormalizationStage import DistanceNormalizationStage
 
 # --- Import Data Loader ---
 # Assuming get_dataloader is defined elsewhere and handles data loading/preprocessing
@@ -43,10 +45,9 @@ if __name__ == "__main__":
     # Define variables for ONNX export shape outside the try block
     SEQ_LEN, NUM_LANDMARKS, NUM_COORDS = None, None, None
     try:
-        # Load data using the provided function and config settings
-        train_loader = get_dataloader(config.CONFIG_PATH, 'Train', batch_size_override=config.BATCH_SIZE)
-        val_loader = get_dataloader(config.CONFIG_PATH, 'Validation', batch_size_override=config.BATCH_SIZE)
-        test_loader = get_dataloader(config.CONFIG_PATH, 'Test', batch_size_override=config.BATCH_SIZE)
+        train_loader = get_dataloader(config.CONFIG_PATH, 'Train', batch_size_override=config.BATCH_SIZE, transform_pipeline=config.TRAIN_DATALOADER_PIPELINE)
+        val_loader = get_dataloader(config.CONFIG_PATH, 'Validation', batch_size_override=config.BATCH_SIZE, transform_pipeline=config.VALIDATION_DATALOADER_PIPELINE)
+        test_loader = get_dataloader(config.CONFIG_PATH, 'Test', batch_size_override=config.BATCH_SIZE, transform_pipeline=config.TEST_DATALOADER_PIPELINE)
         if not train_loader or not val_loader or not test_loader:
             raise ValueError("One or more dataloaders failed to initialize.")
 

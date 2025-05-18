@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 # --- Import the UPDATED (simplified) V2 model ---
 from Model.models.lstm_model_v2 import LstmModelV2 # Import the simplified V2
+from Preprocess.Pipeline.OrchestrationPipeline import OrchestrationPipeline
+from Preprocess.Pipeline.Stages.dataloader_stages.DistanceNormalizationStage import DistanceNormalizationStage
 
 # ================================================
 # === Configuration V2 (Simplified + Rescore) ===
@@ -38,6 +40,22 @@ CONFUSION_MATRIX_PATH = os.path.join(SAVE_DIR, "confusion_matrix_regression_mapp
 SAVE_BEST_MODEL_PTH = True
 SAVE_FINAL_MODEL_ONNX = True
 LOAD_SAVED_STATE = True # Set to False to force retraining
+
+TRAIN_DATALOADER_PIPELINE = OrchestrationPipeline(
+            stages=[
+                DistanceNormalizationStage(verbose=False),
+            ],
+        )
+VALIDATION_DATALOADER_PIPELINE = OrchestrationPipeline(
+            stages=[
+                DistanceNormalizationStage(verbose=False),
+            ],
+        )
+TEST_DATALOADER_PIPELINE = OrchestrationPipeline(
+            stages=[
+                DistanceNormalizationStage(verbose=False),
+            ],
+        )
 
 # --- Mappings ---
 LABEL_TO_IDX_MAP = { # Keep this the same

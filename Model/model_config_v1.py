@@ -2,6 +2,8 @@ import os
 import torch
 import torch.nn as nn
 from Model.models.gru_model import GruModel
+from Preprocess.Pipeline.OrchestrationPipeline import OrchestrationPipeline
+from Preprocess.Pipeline.Stages.dataloader_stages.DistanceNormalizationStage import DistanceNormalizationStage
 
 # ================================================
 # === Configuration ===
@@ -35,6 +37,22 @@ CONFUSION_MATRIX_PATH = os.path.join(SAVE_DIR, "confusion_matrix_regression_mapp
 SAVE_BEST_MODEL_PTH = True # Save best model state dict during training?
 SAVE_FINAL_MODEL_ONNX = True # Save the final best model as ONNX after training?
 LOAD_SAVED_STATE = True # Attempt to load MODEL_SAVE_PATH_PTH before training?
+
+TRAIN_DATALOADER_PIPELINE = OrchestrationPipeline(
+            stages=[
+                DistanceNormalizationStage(verbose=False),
+            ],
+        )
+VALIDATION_DATALOADER_PIPELINE = OrchestrationPipeline(
+            stages=[
+                DistanceNormalizationStage(verbose=False),
+            ],
+        )
+TEST_DATALOADER_PIPELINE = OrchestrationPipeline(
+            stages=[
+                DistanceNormalizationStage(verbose=False),
+            ],
+        )
 
 # --- Mappings ---
 LABEL_TO_IDX_MAP = {
