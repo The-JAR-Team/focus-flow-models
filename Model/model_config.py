@@ -3,6 +3,8 @@
 import os
 import torch
 import torch.nn as nn
+
+from Model.mesh_flipmap import mesh_annotations_derived_flip_map
 # --- Import the NEW GRU Attention model ---
 from Model.models.gru_attention_model import GruAttentionModel
 from Preprocess.Pipeline.OrchestrationPipeline import OrchestrationPipeline
@@ -37,8 +39,8 @@ LOSS_CURVE_PATH = os.path.join(SAVE_DIR, "loss_curves.png")
 ACC_CURVE_PATH = os.path.join(SAVE_DIR, "mapped_accuracy_curve.png")
 CONFUSION_MATRIX_PATH = os.path.join(SAVE_DIR, "confusion_matrix_regression_mapped.png")
 
-SAVE_BEST_MODEL_PTH = False
-SAVE_FINAL_MODEL_ONNX = False
+SAVE_BEST_MODEL_PTH = True
+SAVE_FINAL_MODEL_ONNX = True
 LOAD_SAVED_STATE = True # Set to False to force training from scratch
 
 TRAIN_DATALOADER_PIPELINE = OrchestrationPipeline(
@@ -48,7 +50,7 @@ TRAIN_DATALOADER_PIPELINE = OrchestrationPipeline(
                     add_noise_prob=0.5, noise_std=0.02,
                     random_scale_prob=0.5, scale_range=(0.95, 1.05),
                     random_rotate_prob=0.5, max_rotation_angle_deg=10,
-                    random_flip_prob=0.5,
+                    random_flip_prob=0.5, landmark_flip_map=mesh_annotations_derived_flip_map,
                     verbose=False
                 ),
             ],
