@@ -4,6 +4,7 @@
 # Custom directories / files to ignore
 Preprocess/Pipeline/DaiseeConfig.py
 Preprocess/Pipeline/config.py
+Model_Training/configs/data_sources.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
