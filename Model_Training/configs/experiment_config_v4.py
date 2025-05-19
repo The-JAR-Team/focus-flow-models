@@ -190,7 +190,7 @@ PLOTTING_CALLBACK_PARAMS = {
 }
 
 
-LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = "./training_runs_output/engagement_multitask_v4/final_exported_models/model.safetensors"
+LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = "./training_runs_output/engagement_multitask_v4/final_exported_models/model-1e.safetensors"
 SAVE_FINAL_PYTORCH_MODEL: bool = True
 PERFORM_ONNX_EXPORT: bool = True
 
