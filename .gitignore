@@ -5,12 +5,12 @@
 Preprocess/Pipeline/DaiseeConfig.py
 Preprocess/Pipeline/config.py
 Model_Training/configs/data_sources.json
-
+Model_Training/training_runs_output/*/trainer_artifacts/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.JonPc
 # C extensions
 *.so
 
