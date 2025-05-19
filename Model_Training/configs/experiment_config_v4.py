@@ -16,14 +16,14 @@ EARLY_STOPPING_PATIENCE = 5
 EARLY_STOPPING_THRESHOLD = 0.001
 
 TRAINING_HYPERPARAMS = {
-    "num_train_epochs": 25,
+    "num_train_epochs": 1,
     "per_device_train_batch_size": 32,
     "per_device_eval_batch_size": 64,
     "learning_rate": 5e-5,
     "warmup_ratio": 0.1,
     "weight_decay": 0.01,
     "logging_strategy": "steps",
-    "logging_steps": 50,
+    "logging_steps": 100,
     "eval_strategy": "epoch",
     "save_strategy": "epoch",
     "save_total_limit": 3, # Keep N best/recent checkpoints + final best model
@@ -190,7 +190,7 @@ PLOTTING_CALLBACK_PARAMS = {
 }
 
 
-LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = None
+LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = "./training_runs_output/engagement_multitask_v4/final_exported_models/model.safetensors"
 SAVE_FINAL_PYTORCH_MODEL: bool = True
 PERFORM_ONNX_EXPORT: bool = True
 

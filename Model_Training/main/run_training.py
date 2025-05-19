@@ -7,6 +7,7 @@ import numpy as np
 import functools  # For partial function application
 from datetime import datetime
 from typing import Optional, Dict, Any, Union  # For type hints
+from safetensors.torch import load_file as load_safetensors_file
 
 from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 from transformers.trainer_utils import get_last_checkpoint  # For resuming
@@ -141,28 +142,33 @@ def main():
         classification_loss_fn=exp_config.CLASSIFICATION_LOSS_FN
     )
 
-    # Load initial weights if specified (and not resuming a full trainer checkpoint)
-    # Note: RESUME_FROM_CHECKPOINT logic is handled by Trainer.train() argument later.
-    # This section is for starting a *new* training run with pre-initialized weights.
     if exp_config.LOAD_INITIAL_WEIGHTS_PATH:
-        print(f"Attempting to load initial weights from: {exp_config.LOAD_INITIAL_WEIGHTS_PATH}")
+        load_path = exp_config.LOAD_INITIAL_WEIGHTS_PATH
+        print(f"Attempting to load initial weights from: {load_path}")
         try:
-            if os.path.exists(exp_config.LOAD_INITIAL_WEIGHTS_PATH):
-                state_dict = torch.load(exp_config.LOAD_INITIAL_WEIGHTS_PATH, map_location=device)
+            if os.path.exists(load_path):
+                if load_path.endswith(".safetensors"):
+                    print(f"Loading .safetensors file from: {load_path}")
+                    state_dict = load_safetensors_file(load_path, device=device.type)  # device.type is 'cpu' or 'cuda'
+                elif load_path.endswith(".bin"):
+                    print(f"Loading .bin file from: {load_path}")
+                    state_dict = torch.load(load_path, map_location=device)
+                else:
+                    print(
+                        f"Warning: Unknown file extension for LOAD_INITIAL_WEIGHTS_PATH: {load_path}. Attempting with torch.load().")
+                    state_dict = torch.load(load_path, map_location=device)
+
                 # Handle potential "module." prefix if saved from DataParallel/DDP
                 if isinstance(state_dict, dict) and all(key.startswith("module.") for key in state_dict.keys()):
                     print("Removing 'module.' prefix from state_dict keys.")
                     state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
 
                 model.load_state_dict(state_dict, strict=True)  # Set strict=False if you expect missing/extra keys
-                print(f"Successfully loaded initial weights into model from {exp_config.LOAD_INITIAL_WEIGHTS_PATH}")
+                print(f"Successfully loaded initial weights into model from {load_path}")
             else:
-                print(
-                    f"Warning: LOAD_INITIAL_WEIGHTS_PATH '{exp_config.LOAD_INITIAL_WEIGHTS_PATH}' not found. Starting with random weights.")
+                print(f"Warning: LOAD_INITIAL_WEIGHTS_PATH '{load_path}' not found. Starting with random weights.")
         except Exception as e:
-            print(
-                f"Error loading initial weights from {exp_config.LOAD_INITIAL_WEIGHTS_PATH}: {e}. Starting with random weights.")
-
+            print(f"Error loading initial weights from {load_path}: {e}. Starting with random weights.")
     model.to(device)
     print(f"Model '{exp_config.MODEL_CLASS.__name__}' initialized and moved to {device}.")
 
