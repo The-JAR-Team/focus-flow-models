@@ -1,0 +1,10 @@
+{
+  "base_cache_dir": "/your/absolute/path/to/the/main_cache_directory_for_datasets",
+  "dataset_configurations": {
+    "EngageNet_10fps_quality95_RandSplit_60_20_20": {
+      "description": "EngageNet dataset, processed at 10fps, 95% quality, with a 60/20/20 random split. Contains Train, Validation, and Test sets.",
+      "data_path": "Abs path to data",
+      "landmarks": 478
+    }
+  }
+}
