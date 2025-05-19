@@ -1,6 +1,6 @@
 import os
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg') # Use a non-interactive backend
 import matplotlib.pyplot as plt
 from typing import List, Dict, Any, Optional
 import pandas as pd
@@ -20,7 +20,7 @@ def plot_hf_training_history(
 
     Args:
         log_history (List[Dict[str, Any]]): The log_history from TrainerState.
-                                            Each dict contains metrics like 'epoch', 'loss',
+                                            Each dict contains metrics like 'epoch', 'train_loss',
                                             'eval_loss', 'learning_rate', 'eval_mse', etc.
         output_dir (str): Directory where the plot images will be saved.
         loss_plot_filename (str): Filename for the loss plot.
@@ -33,7 +33,7 @@ def plot_hf_training_history(
         return
 
     os.makedirs(output_dir, exist_ok=True)
-    plt.style.use('seaborn-v0_8-darkgrid')
+    plt.style.use('seaborn-v0_8-darkgrid') # Using a seaborn style
 
     # Convert log_history to a pandas DataFrame for easier manipulation
     try:
@@ -42,42 +42,62 @@ def plot_hf_training_history(
         print(f"Error converting log_history to DataFrame: {e}. Plotting skipped.")
         return
 
-    # --- Prepare data for plotting ---
-    # Training logs (loss, learning_rate) - typically more frequent
-    train_logs = df[df['loss'].notna()].copy()  # Entries with 'loss' are training steps
-    if 'epoch' not in train_logs.columns and 'step' in train_logs.columns:
-        # If 'epoch' is missing for training steps, use 'step' as x-axis
-        train_logs['x_axis_train'] = train_logs['step']
-        train_x_label = 'Training Steps'
-    elif 'epoch' in train_logs.columns:
-        train_logs['x_axis_train'] = train_logs['epoch']
-        train_x_label = 'Epochs (Training Steps)'
-    else:  # Fallback if neither epoch nor step is present for training logs
-        print(
-            "Warning: Could not determine x-axis for training logs. Skipping training loss/LR plots if data is missing.")
-        train_logs = pd.DataFrame()  # Empty dataframe
+
+    if 'train_loss' in df.columns:
+        train_logs = df[df['train_loss'].notna()].copy()  # Entries with 'train_loss' are training steps
+    else:
+        print("Warning: 'train_loss' column not found in logs. Skipping training loss/LR plots if data is missing.")
+        print("DataFrame columns:", df.columns)
+        print("DataFrame head:\n", df.head().to_string())  # .to_string() for better console output of head
+        print("Warning: 'train_loss' column not found in logs. Skipping training loss/LR plots if data is missing.")
+        train_logs = pd.DataFrame() # Empty dataframe
+
+    if not train_logs.empty:
+        if 'epoch' not in train_logs.columns and 'step' in train_logs.columns:
+            # If 'epoch' is missing for training steps, use 'step' as x-axis
+            train_logs['x_axis_train'] = train_logs['step']
+            train_x_label = 'Training Steps'
+        elif 'epoch' in train_logs.columns:
+            train_logs['x_axis_train'] = train_logs['epoch']
+            train_x_label = 'Epochs (Training Steps)'
+        else:  # Fallback if neither epoch nor step is present for training logs
+            print(
+                "Warning: Could not determine x-axis for training logs. Skipping training loss/LR plots if data is missing.")
+            train_logs = pd.DataFrame()  # Empty dataframe
+    else: # If train_logs started empty
+        train_x_label = 'Training Steps/Epochs' # Default label
 
     # Evaluation logs - typically have 'eval_loss' and other 'eval_*' metrics
-    eval_logs = df[df['eval_loss'].notna()].copy()  # Entries with 'eval_loss' are evaluation steps
-    if 'epoch' not in eval_logs.columns and 'step' in eval_logs.columns:
-        eval_logs['x_axis_eval'] = eval_logs['step']
-        eval_x_label = 'Evaluation Steps'
-    elif 'epoch' in eval_logs.columns:
-        eval_logs['x_axis_eval'] = eval_logs['epoch']
-        eval_x_label = 'Epochs'
-    else:  # Fallback
-        print("Warning: Could not determine x-axis for evaluation logs. Skipping evaluation plots if data is missing.")
-        eval_logs = pd.DataFrame()  # Empty dataframe
+    if 'eval_loss' in df.columns:
+        eval_logs = df[df['eval_loss'].notna()].copy()  # Entries with 'eval_loss' are evaluation steps
+    else:
+        print("Warning: 'eval_loss' column not found in logs. Skipping evaluation plots if data is missing.")
+        eval_logs = pd.DataFrame()
+
+    if not eval_logs.empty:
+        if 'epoch' not in eval_logs.columns and 'step' in eval_logs.columns:
+            eval_logs['x_axis_eval'] = eval_logs['step']
+            eval_x_label = 'Evaluation Steps'
+        elif 'epoch' in eval_logs.columns:
+            eval_logs['x_axis_eval'] = eval_logs['epoch']
+            eval_x_label = 'Epochs'
+        else:  # Fallback
+            print("Warning: Could not determine x-axis for evaluation logs. Skipping evaluation plots if data is missing.")
+            eval_logs = pd.DataFrame()  # Empty dataframe
+    else: # If eval_logs started empty
+        eval_x_label = 'Evaluation Steps/Epochs' # Default label
+
 
     # --- 1. Plot Training and Validation Loss ---
-    if not train_logs.empty and 'loss' in train_logs.columns and \
+    # MODIFIED: Changed 'loss' to 'train_loss' in conditions and plotting
+    if not train_logs.empty and 'train_loss' in train_logs.columns and \
             not eval_logs.empty and 'eval_loss' in eval_logs.columns and \
             'x_axis_train' in train_logs.columns and 'x_axis_eval' in eval_logs.columns:
         try:
             plt.figure(figsize=(12, 6))
 
             # Plot training loss (potentially many points if logged per step)
-            plt.plot(train_logs['x_axis_train'], train_logs['loss'], 'bo-', alpha=0.7, markersize=3, linewidth=1,
+            plt.plot(train_logs['x_axis_train'], train_logs['train_loss'], 'bo-', alpha=0.7, markersize=3, linewidth=1,
                      label='Training Loss (per step/epoch)')
 
             # Plot validation loss (typically per epoch)
@@ -96,9 +116,10 @@ def plot_hf_training_history(
             print(f"Loss plot saved to {save_path}")
         except Exception as e:
             print(f"Error plotting loss curves: {e}")
-            plt.close()
+            if plt.get_fignums(): # Check if a figure is open before trying to close
+                plt.close()
     else:
-        print("Skipping loss plot: Missing 'loss' or 'eval_loss' or their x-axis data in logs.")
+        print("Skipping loss plot: Missing 'train_loss' or 'eval_loss' or their x-axis data in logs.")
 
     # --- 2. Plot Learning Rate ---
     if not train_logs.empty and 'learning_rate' in train_logs.columns and 'x_axis_train' in train_logs.columns:
@@ -118,9 +139,10 @@ def plot_hf_training_history(
             print(f"Learning rate plot saved to {save_path}")
         except Exception as e:
             print(f"Error plotting learning rate: {e}")
-            plt.close()
+            if plt.get_fignums():
+                plt.close()
     else:
-        print("Skipping learning rate plot: Missing 'learning_rate' or its x-axis data in logs.")
+        print("Skipping learning rate plot: Missing 'learning_rate' or its x-axis data in logs (Note: 'learning_rate' was not found in the provided DataFrame columns).")
 
     # --- 3. Plot Regression Metrics (MSE, MAE, R2 from evaluation logs) ---
     reg_metrics_to_plot = {'eval_mse': 'MSE', 'eval_mae': 'MAE', 'eval_r2': 'R² Score'}
@@ -149,7 +171,8 @@ def plot_hf_training_history(
             print(f"Regression metrics plot saved to {save_path}")
         except Exception as e:
             print(f"Error plotting regression metrics: {e}")
-            plt.close()
+            if plt.get_fignums():
+                plt.close()
     else:
         print(
             "Skipping regression metrics plot: No evaluation regression metrics (eval_mse, eval_mae, eval_r2) or x-axis found in logs.")
@@ -185,7 +208,8 @@ def plot_hf_training_history(
             print(f"Classification metrics plot saved to {save_path}")
         except Exception as e:
             print(f"Error plotting classification metrics: {e}")
-            plt.close()
+            if plt.get_fignums():
+                plt.close()
     else:
         print(
             "Skipping classification metrics plot: No evaluation classification accuracy metrics or x-axis found in logs.")
