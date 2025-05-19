@@ -17,8 +17,8 @@ EARLY_STOPPING_THRESHOLD = 0.001
 
 TRAINING_HYPERPARAMS = {
     "num_train_epochs": 50,
-    "per_device_train_batch_size": 32,
-    "per_device_eval_batch_size": 64,
+    "per_device_train_batch_size": 64,
+    "per_device_eval_batch_size": 124,
     "learning_rate": 5e-5,
     "warmup_ratio": 0.1,
     "weight_decay": 0.01,
