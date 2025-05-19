@@ -15,8 +15,6 @@ class LabelProcessorStage(BaseStage):
         self.label_to_idx_map = label_to_idx_map
         self.idx_to_score_map = idx_to_score_map
         self.engagement_key = engagement_key  # Key in the raw label dict that holds the string label
-        if self.verbose:
-            print(f"LabelProcessorStage initialized. Engagement key: '{self.engagement_key}'")
 
     def process(self, x: torch.Tensor, y_raw: Dict[str, Any]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """

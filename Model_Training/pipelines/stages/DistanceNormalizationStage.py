@@ -30,17 +30,6 @@ class DistanceNormalizationStage(BaseStage):
         self.right_eye_outer_corner_index = right_eye_outer_corner_index
         self.verbose_stage = verbose # Renamed to avoid conflict with process method's verbose
 
-        # --- IMPORTANT NOTE ON LANDMARK INDICES ---
-        # The default indices (1, 33, 263) are common for MediaPipe Face Mesh (468 landmarks).
-        # You are using a 478 landmark model. YOU MUST VERIFY AND UPDATE THESE INDICES
-        # to correspond to the correct anatomical locations in YOUR specific landmark set.
-        # Failure to do so will result in incorrect normalization.
-        print(f"DistanceNormalizationStage initialized. \n"
-              f"IMPORTANT: Using landmark indices: \n"
-              f"  Nose Tip: {self.nose_tip_index}\n"
-              f"  Left Eye Outer Corner: {self.left_eye_outer_corner_index}\n"
-              f"  Right Eye Outer Corner: {self.right_eye_outer_corner_index}\n"
-              f"Please VERIFY these indices are correct for your 478 landmark model.")
 
     def process(self, x: torch.Tensor, y: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """

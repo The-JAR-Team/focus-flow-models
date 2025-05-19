@@ -49,13 +49,6 @@ class DataAugmentationStage(BaseStage):
         if self.random_flip_prob > 0 and self.landmark_flip_map is None:
             raise ValueError("landmark_flip_map is required when random_flip_prob > 0.")
 
-        if self.verbose_stage:
-            print(f"DataAugmentationStage initialized with params:\n"
-                  f"  Noise: prob={add_noise_prob}, std={noise_std}\n"
-                  f"  Scale: prob={random_scale_prob}, range={scale_range}\n"
-                  f"  Rotate: prob={random_rotate_prob}, max_angle_deg={max_rotation_angle_deg}\n"
-                  f"  Flip: prob={random_flip_prob}, map_provided={landmark_flip_map is not None}")
-
     def process(self, x: torch.Tensor, y: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Applies augmentations to the landmark tensor.
