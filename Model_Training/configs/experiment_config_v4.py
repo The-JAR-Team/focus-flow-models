@@ -23,7 +23,7 @@ TRAINING_HYPERPARAMS = {
     "warmup_ratio": 0.1,
     "weight_decay": 0.01,
     "logging_strategy": "steps",
-    "logging_steps": 100,
+    "logging_steps": 50,
     "eval_strategy": "epoch",
     "save_strategy": "epoch",
     "save_total_limit": 3, # Keep N best/recent checkpoints + final best model
@@ -143,7 +143,7 @@ TRAIN_PIPELINE = OrchestrationPipeline(
     stages=[
         label_processor_stage_instance,
         distance_normalization_stage_instance,
-        # data_augmentation_stage_instance,
+        data_augmentation_stage_instance,
         # Add other stages for training as needed
     ]
 )
