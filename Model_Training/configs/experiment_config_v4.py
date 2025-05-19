@@ -16,7 +16,7 @@ EARLY_STOPPING_PATIENCE = 5
 EARLY_STOPPING_THRESHOLD = 0.001
 
 TRAINING_HYPERPARAMS = {
-    "num_train_epochs": 1,
+    "num_train_epochs": 50,
     "per_device_train_batch_size": 32,
     "per_device_eval_batch_size": 64,
     "learning_rate": 5e-5,

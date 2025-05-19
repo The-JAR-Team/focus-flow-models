@@ -40,7 +40,7 @@ def get_landmark_count_from_config(data_sources_path: str, dataset_config_name_k
     return int(landmarks)
 
 
-def main():
+def main(project_root: str = PROJECT_ROOT) -> None:
     # --- 0. Determine Device and Dataloader Workers ---
     print("--- Setup ---")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -68,11 +68,11 @@ def main():
 
     # --- 1. Paths and Directory Setup ---
     print("\n--- Path and Directory Setup ---")
-    data_sources_json_path = os.path.join(PROJECT_ROOT, "configs", "data_sources.json")
+    data_sources_json_path = os.path.join(project_root, "configs", "data_sources.json")
 
     # Base path for all outputs of this specific experiment run
     experiment_run_base_dir = os.path.join(
-        PROJECT_ROOT,
+        project_root,
         exp_config.BASE_OUTPUT_DIR.lstrip("./\\"),  # Remove potential leading ./
         exp_config.EXPERIMENT_NAME
     )
@@ -143,7 +143,7 @@ def main():
     )
 
     if exp_config.LOAD_INITIAL_WEIGHTS_PATH:
-        load_path = exp_config.LOAD_INITIAL_WEIGHTS_PATH
+        load_path = project_root + exp_config.LOAD_INITIAL_WEIGHTS_PATH
         print(f"Attempting to load initial weights from: {load_path}")
         try:
             if os.path.exists(load_path):

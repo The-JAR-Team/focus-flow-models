@@ -1,7 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$" />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/.venv/Lib" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv/Scripts" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv/share" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/checkpoint-170" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_03-59-09_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_04-05-40_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_04-28-11_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_04-32-38_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_04-36-17_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_04-40-50_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_04-42-29_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_05-20-01_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_05-47-22_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_05-48-51_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_05-50-01_JonPc" />
+    </content>
     <orderEntry type="jdk" jdkName="Python 3.12 (focus-flow-models)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
