@@ -17,15 +17,9 @@
       <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_05-47-22_JonPc" />
       <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_05-48-51_JonPc" />
       <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_05-50-01_JonPc" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv1" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.12 (focus-flow-models)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.12 (models) (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
-  </component>
-  <component name="PyNamespacePackagesService">
-    <option name="namespacePackageFolders">
-      <list>
-        <option value="$MODULE_DIR$/Model_Training" />
-      </list>
-    </option>
   </component>
 </module>

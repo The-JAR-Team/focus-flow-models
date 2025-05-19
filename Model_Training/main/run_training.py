@@ -1,4 +1,3 @@
-# Model_Training/main/run_training.py
 import os
 import sys
 import torch
