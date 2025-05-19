@@ -143,7 +143,7 @@ TRAIN_PIPELINE = OrchestrationPipeline(
     stages=[
         label_processor_stage_instance,
         distance_normalization_stage_instance,
-        data_augmentation_stage_instance,
+        # data_augmentation_stage_instance,
         # Add other stages for training as needed
     ]
 )
