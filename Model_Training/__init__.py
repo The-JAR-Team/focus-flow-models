@@ -21,9 +21,3 @@ __all__ = [
     # "EngagementMultiTaskGRUAttentionModel", # if you uncommented its import above
     # "compute_metrics", # if you uncommented its import above
 ]
-
-if start_training:
-    print(f"DEBUG: Model_Training package initialized. 'start_training' function is available.")
-else:
-    print(f"DEBUG: Model_Training package initialized, but 'start_training' function is NOT available due to import issues.")
-

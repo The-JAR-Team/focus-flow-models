@@ -12,8 +12,8 @@ from Model_Training.pipelines.stages.DistanceNormalizationStage import DistanceN
 from Model_Training.pipelines.stages.label_processor_stage import LabelProcessorStage
 
 
-EARLY_STOPPING_PATIENCE = 5
-EARLY_STOPPING_THRESHOLD = 0.001
+EARLY_STOPPING_PATIENCE = 51
+EARLY_STOPPING_THRESHOLD = 0.01
 
 TRAINING_HYPERPARAMS = {
     "num_train_epochs": 50,
@@ -31,7 +31,7 @@ TRAINING_HYPERPARAMS = {
     "metric_for_best_model": "eval_mae", # Ensure 'eval_' prefix matches Trainer's logs
     "greater_is_better": False, # For MAE (lower is better)
     "fp16": True, # Enable mixed precision if CUDA is available
-    "dataloader_num_workers": 4, # Adjust based on your CPU cores / system
+    "dataloader_num_workers": 0, # Adjust based on your CPU cores / system
     "dataloader_pin_memory": True,
     "report_to": "tensorboard", # Options: "tensorboard", "wandb", "none"
 }
@@ -143,7 +143,7 @@ TRAIN_PIPELINE = OrchestrationPipeline(
     stages=[
         label_processor_stage_instance,
         distance_normalization_stage_instance,
-        data_augmentation_stage_instance,
+        # data_augmentation_stage_instance,
         # Add other stages for training as needed
     ]
 )
@@ -190,7 +190,7 @@ PLOTTING_CALLBACK_PARAMS = {
 }
 
 
-LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = "./training_runs_output/engagement_multitask_v4/final_exported_models/model-1e.safetensors"
+LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = "./training_runs_output/engagement_multitask_v4/final_exported_models/model_1e_20ea.safetensors"
 SAVE_FINAL_PYTORCH_MODEL: bool = True
 PERFORM_ONNX_EXPORT: bool = True
 
