@@ -96,8 +96,8 @@ EXPERIMENT_NAME = "engagement_multitask_v4" # Used to create a subdirectory in B
 # LOSS_CURVE_FILENAME = "loss_curves.png" # Defined in PLOTTING_CALLBACK_PARAMS
 # METRICS_CURVE_FILENAME = "metrics_curves.png" # Defined in PLOTTING_CALLBACK_PARAMS
 # LR_CURVE_FILENAME = "learning_rate_curve.png" # Defined in PLOTTING_CALLBACK_PARAMS
-CONFUSION_MATRIX_EVAL_FILENAME = "confusion_matrix_eval.png" # For validation set
-CONFUSION_MATRIX_TEST_FILENAME = "confusion_matrix_test.png" # For test set (if used)
+CONFUSION_MATRIX_EVAL_FILENAME = "cm_eval.png" # For validation set
+CONFUSION_MATRIX_TEST_FILENAME = "cm_test.png" # For test set (if used)
 
 
 MESH_FLIP_MAP = mesh_annotations_derived_flip_map
