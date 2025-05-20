@@ -1,5 +1,5 @@
 # engagement_hf_trainer/configs/experiment_config.py
-from typing import Optional
+from typing import Optional, Dict # Added Dict
 
 import torch
 import torch.nn as nn
@@ -16,7 +16,7 @@ EARLY_STOPPING_PATIENCE = 51
 EARLY_STOPPING_THRESHOLD = 0.01
 
 TRAINING_HYPERPARAMS = {
-    "num_train_epochs": 50,
+    "num_train_epochs": 20,
     "per_device_train_batch_size": 64,
     "per_device_eval_batch_size": 124,
     "learning_rate": 5e-5,
@@ -24,10 +24,10 @@ TRAINING_HYPERPARAMS = {
     "weight_decay": 0.01,
     "logging_strategy": "steps",
     "logging_steps": 50,
-    "eval_strategy": "epoch",
-    "save_strategy": "epoch",
+    "eval_strategy": "epoch", # Evaluate at the end of each epoch
+    "save_strategy": "epoch", # Save checkpoint at the end of each epoch
     "save_total_limit": 3, # Keep N best/recent checkpoints + final best model
-    "load_best_model_at_end": True,
+    "load_best_model_at_end": True, # Load the best model at the end of training
     "metric_for_best_model": "eval_mae", # Ensure 'eval_' prefix matches Trainer's logs
     "greater_is_better": False, # For MAE (lower is better)
     "fp16": True, # Enable mixed precision if CUDA is available
@@ -37,7 +37,7 @@ TRAINING_HYPERPARAMS = {
 }
 
 # --- Label Mappings (Crucial for data processing and evaluation) ---
-LABEL_TO_IDX_MAP = {
+LABEL_TO_IDX_MAP: Dict[str, int] = {
     'Not Engaged': 0, 'Barely Engaged': 1, 'Engaged': 2, 'Highly Engaged': 3,
     'not engaged': 0, 'not-engaged': 0, 'Not-Engaged': 0,
     'barely engaged': 1, 'barely-engaged': 1, 'Barely-engaged': 1,
@@ -45,7 +45,7 @@ LABEL_TO_IDX_MAP = {
     'snp(subject not present)': 4, 'SNP(Subject Not Present)': 4, 'SNP': 4,
 }
 
-IDX_TO_SCORE_MAP = {
+IDX_TO_SCORE_MAP: Dict[int, float] = {
     # Index: Score
     4: 0.05,  # SNP
     0: 0.30,  # Not Engaged
@@ -54,7 +54,7 @@ IDX_TO_SCORE_MAP = {
     3: 0.95   # Highly Engaged
 }
 
-IDX_TO_NAME_MAP = {
+IDX_TO_NAME_MAP: Dict[int, str] = {
     0: 'Not Engaged',
     1: 'Barely Engaged',
     2: 'Engaged',
@@ -93,23 +93,24 @@ EXPERIMENT_NAME = "engagement_multitask_v4" # Used to create a subdirectory in B
 
 # --- Paths for Custom Callbacks (ONNX, Plots) ---
 # Filenames; they will be joined with the Trainer's output_dir in the run_script
-LOSS_CURVE_FILENAME = "loss_curves.png"
-METRICS_CURVE_FILENAME = "metrics_curves.png" # For other metrics like MAE, R2, cls_accuracy
-LR_CURVE_FILENAME = "learning_rate_curve.png"
-CONFUSION_MATRIX_FILENAME = "confusion_matrix.png"
+# LOSS_CURVE_FILENAME = "loss_curves.png" # Defined in PLOTTING_CALLBACK_PARAMS
+# METRICS_CURVE_FILENAME = "metrics_curves.png" # Defined in PLOTTING_CALLBACK_PARAMS
+# LR_CURVE_FILENAME = "learning_rate_curve.png" # Defined in PLOTTING_CALLBACK_PARAMS
+CONFUSION_MATRIX_EVAL_FILENAME = "confusion_matrix_eval.png" # For validation set
+CONFUSION_MATRIX_TEST_FILENAME = "confusion_matrix_test.png" # For test set (if used)
 
 
 MESH_FLIP_MAP = mesh_annotations_derived_flip_map
 
 
 DATA_AUGMENTATION_PARAMS = {
-    "add_noise_prob": 0.5,
-    "noise_std": 0.01, # Adjusted from 0.02 in original config
-    "random_scale_prob": 0.5,
-    "scale_range": (0.9, 1.1), # Adjusted from (0.95, 1.05)
-    "random_rotate_prob": 0.5,
-    "max_rotation_angle_deg": 10.0,
-    "random_flip_prob": 0.5,
+    "add_noise_prob": 0.1,
+    "noise_std": 0.001,
+    "random_scale_prob": 0.1,
+    "scale_range": (0.95, 1.05), # Adjusted from (0.95, 1.05)
+    "random_rotate_prob": 0.2,
+    "max_rotation_angle_deg": 30.0,
+    "random_flip_prob": 0.2,
     "landmark_flip_map": MESH_FLIP_MAP,
     "verbose": False
 }
@@ -143,7 +144,7 @@ TRAIN_PIPELINE = OrchestrationPipeline(
     stages=[
         label_processor_stage_instance,
         distance_normalization_stage_instance,
-        # data_augmentation_stage_instance,
+        # data_augmentation_stage_instance, # Currently commented out
         # Add other stages for training as needed
     ]
 )
@@ -182,21 +183,23 @@ ONNX_EXPORT_PARAMS = {
 }
 
 PLOTTING_CALLBACK_PARAMS = {
-    "loss_plot_filename": "loss_curves.png",
-    "lr_plot_filename": "learning_rate_curve.png",
-    "regression_metrics_plot_filename": "regression_metrics.png",
-    "classification_metrics_plot_filename": "classification_metrics.png"
-    # CONFUSION_MATRIX_FILENAME (old) = "confusion_matrix.png" # Not currently plotted by callback
+    "loss_plot_filename": "training_validation_loss.png", # Matching original plotting.py default
+    "lr_plot_filename": "learning_rate.png", # Matching original plotting.py default
+    "regression_metrics_plot_filename": "regression_metrics.png", # Matching original plotting.py default
+    "classification_metrics_plot_filename": "classification_metrics.png", # Matching original plotting.py default
+    "confusion_matrix_eval_filename": CONFUSION_MATRIX_EVAL_FILENAME,
+    "confusion_matrix_test_filename": CONFUSION_MATRIX_TEST_FILENAME,
+    # We will pass idx_to_name_map directly to the callback from run_training.py
 }
 
 
-LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = "./training_runs_output/engagement_multitask_v4/final_exported_models/model_1e_20ea.safetensors"
+LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = "./training_runs_output/engagement_multitask_v4/final_exported_models/model_1e_20ea_50e.safetensors"
 SAVE_FINAL_PYTORCH_MODEL: bool = True
 PERFORM_ONNX_EXPORT: bool = True
 
 TRAINER_ARTIFACTS_SUBDIR_NAME = "trainer_artifacts"
 FINAL_MODELS_SUBDIR_NAME = "final_exported_models"
-PLOTS_PARENT_SUBDIR_NAME = "training_plots"
+PLOTS_PARENT_SUBDIR_NAME = "training_plots" # Parent directory for timestamped plot folders
 
 if __name__ == '__main__':
     print("--- Experiment Configuration Loaded ---")
@@ -206,4 +209,7 @@ if __name__ == '__main__':
     print(f"Classification Loss Weight: {MODEL_PARAMS['classification_loss_weight']}")
     print(f"IDX_TO_SCORE_MAP for SNP (idx 4): {IDX_TO_SCORE_MAP.get(4)}")
     print(f"Train pipeline has {len(TRAIN_PIPELINE.stages)} stages.")
-    print(f"First stage in train pipeline: {TRAIN_PIPELINE.stages[0].__class__.__name__}")
+    if TRAIN_PIPELINE.stages:
+        print(f"First stage in train pipeline: {TRAIN_PIPELINE.stages[0].__class__.__name__}")
+    print(f"Confusion matrix eval filename: {PLOTTING_CALLBACK_PARAMS['confusion_matrix_eval_filename']}")
+
