@@ -12,14 +12,14 @@ from Model_Training.pipelines.stages.DistanceNormalizationStage import DistanceN
 from Model_Training.pipelines.stages.label_processor_stage import LabelProcessorStage
 
 
-EARLY_STOPPING_PATIENCE = 51
+EARLY_STOPPING_PATIENCE = 21
 EARLY_STOPPING_THRESHOLD = 0.01
 
 TRAINING_HYPERPARAMS = {
-    "num_train_epochs": 20,
+    "num_train_epochs": 1,
     "per_device_train_batch_size": 64,
     "per_device_eval_batch_size": 124,
-    "learning_rate": 5e-5,
+    "learning_rate": 0, # 5e-6,
     "warmup_ratio": 0.1,
     "weight_decay": 0.01,
     "logging_strategy": "steps",
@@ -193,9 +193,9 @@ PLOTTING_CALLBACK_PARAMS = {
 }
 
 
-LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = "./training_runs_output/engagement_multitask_v4/final_exported_models/model_1e_20ea_50e.safetensors"
-SAVE_FINAL_PYTORCH_MODEL: bool = True
-PERFORM_ONNX_EXPORT: bool = True
+LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = "./training_runs_output/engagement_multitask_v4/final_exported_models/model.safetensors"
+SAVE_FINAL_PYTORCH_MODEL: bool = False
+PERFORM_ONNX_EXPORT: bool = False
 
 TRAINER_ARTIFACTS_SUBDIR_NAME = "trainer_artifacts"
 FINAL_MODELS_SUBDIR_NAME = "final_exported_models"
