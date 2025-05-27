@@ -145,7 +145,7 @@ PLOTTING_CALLBACK_PARAMS = {
 # --- Model Loading/Saving ---
 # LOAD_INITIAL_WEIGHTS_PATH should be None if RESUME_FROM_CHECKPOINT is used effectively.
 # The Hugging Face Trainer handles loading weights, optimizer, and scheduler from the checkpoint.
-LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = './training_runs_output/engagement_multitask_v4_v2/final_exported_models/model_40.safetensors'
+LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = './training_runs_output/engagement_multitask_v4_v2/final_exported_models/model_40_20.safetensors'
 
 # This variable should be used by your run_training.py script to pass to trainer.train(resume_from_checkpoint=...)
 # It will be the path string if filled, or False if the placeholder isn't filled (to prevent errors).
