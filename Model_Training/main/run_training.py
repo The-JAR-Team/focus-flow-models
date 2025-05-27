@@ -16,10 +16,9 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from Model_Training.configs import experiment_config_v4 as exp_config
+from Model_Training.configs import experiment_config_v4_v2 as exp_config
 from Model_Training.data_handling.data_loader import get_hf_datasets, load_data_sources_config
 from Model_Training.data_handling.collator import multitask_data_collator
-# Model is imported via exp_config.MODEL_CLASS
 
 from Model_Training.utils.metrics import compute_metrics as project_compute_metrics
 from Model_Training.utils.callbacks import PlottingCallback, OnnxExportCallback  # Ensure this is the updated callback
@@ -283,6 +282,9 @@ def main(project_root: str = PROJECT_ROOT) -> None:
         print("Could not find 'frame_norm' attribute on the unwrapped model.")
 
     print("\n--- Evaluating Best Model on Validation Set ---")
+    if hasattr(trainer, 'model') and trainer.model is not None:
+        trainer.model.to(training_args.device)  # Explicitly move trainer's current model
+
     eval_results = trainer.evaluate(eval_dataset=eval_dataset)
     # eval_results now contains the raw metrics, including lists for confusion matrices
     print(f"Validation Set Evaluation Results (raw): {eval_results}")
@@ -306,6 +308,8 @@ def main(project_root: str = PROJECT_ROOT) -> None:
 
     if test_dataset:
         print("\n--- Evaluating Best Model on Test Set ---")
+        if hasattr(trainer, 'model') and trainer.model is not None:  # Ensure again if model could change
+            trainer.model.to(training_args.device)
         test_results = trainer.evaluate(eval_dataset=test_dataset, metric_key_prefix="test")
         print(f"Test Set Evaluation Results (raw): {test_results}")
         sanitized_test_results = sanitize_metrics_for_logging(test_results)

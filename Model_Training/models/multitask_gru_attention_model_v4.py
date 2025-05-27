@@ -109,10 +109,16 @@ class EngagementMultiTaskGRUAttentionModel(nn.Module):
 
             total_loss = current_total_loss
 
+            # --- THIS IS THE KEY CHANGE ---
+            # Prepare the core output dictionary that ALWAYS includes attention_weights
         output = {
             "regression_scores": regression_scores,
-            "classification_logits": classification_logits
+            "classification_logits": classification_logits,
+            # Ensure attention_weights are always included for ONNX export
+            # Squeeze the last dimension if it's 1, for potentially easier handling later
+            "attention_weights": attn_weights.squeeze(-1)  # Or just attn_weights if you prefer to keep the last dim
         }
+
         if total_loss is not None:
             output["loss"] = total_loss
         if loss_reg is not None:
