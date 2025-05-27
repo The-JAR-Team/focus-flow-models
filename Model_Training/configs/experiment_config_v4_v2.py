@@ -7,7 +7,7 @@ import torch.nn as nn
 from Model_Training.configs.mesh_flipmap import mesh_annotations_derived_flip_map
 # Ensure this model file (multitask_gru_attention_model_v4.py) has the forward() method fix
 # for outputting attention_weights.
-from Model_Training.models.multitask_gru_attention_model_v4 import EngagementMultiTaskGRUAttentionModel
+from Model_Training.models.multitask_gru_attention_model_v4_v2 import EngagementMultiTaskGRUAttentionModel
 from Model_Training.pipelines.pipeline import OrchestrationPipeline
 from Model_Training.pipelines.stages.DataAugmentationStage import DataAugmentationStage
 from Model_Training.pipelines.stages.DistanceNormalizationStage import DistanceNormalizationStage
@@ -19,8 +19,8 @@ from Model_Training.pipelines.stages.label_processor_stage import LabelProcessor
 # This path will be used to resume the training session.
 RESUME_FROM_CHECKPOINT_PATH_PREVIOUS_RUN: Optional[str] = None
 # --- Early Stopping Parameters ---
-EARLY_STOPPING_PATIENCE = 7 # Adjusted for continuing training
-EARLY_STOPPING_THRESHOLD = 0.001
+EARLY_STOPPING_PATIENCE = 20
+EARLY_STOPPING_THRESHOLD = 0.1
 
 # --- Training Hyperparameters ---
 TRAINING_HYPERPARAMS = {
