@@ -17,9 +17,7 @@ from Model_Training.pipelines.stages.label_processor_stage import LabelProcessor
 # !!! IMPORTANT: FILL THIS IN with the path to your v4_v2 checkpoint !!!
 # Example: "./training_runs_output/engagement_multitask_v4_v2/trainer_artifacts/checkpoint-3400"
 # This path will be used to resume the training session.
-RESUME_FROM_CHECKPOINT_PATH_PREVIOUS_RUN: Optional[str] = "./training_runs_output/engagement_multitask_v4_v2/final_exported_models/model_40.safetensors"
-
-
+RESUME_FROM_CHECKPOINT_PATH_PREVIOUS_RUN: Optional[str] = None
 # --- Early Stopping Parameters ---
 EARLY_STOPPING_PATIENCE = 7 # Adjusted for continuing training
 EARLY_STOPPING_THRESHOLD = 0.001
@@ -147,7 +145,7 @@ PLOTTING_CALLBACK_PARAMS = {
 # --- Model Loading/Saving ---
 # LOAD_INITIAL_WEIGHTS_PATH should be None if RESUME_FROM_CHECKPOINT is used effectively.
 # The Hugging Face Trainer handles loading weights, optimizer, and scheduler from the checkpoint.
-LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = None
+LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = './training_runs_output/engagement_multitask_v4_v2/final_exported_models/model_40.safetensors'
 
 # This variable should be used by your run_training.py script to pass to trainer.train(resume_from_checkpoint=...)
 # It will be the path string if filled, or False if the placeholder isn't filled (to prevent errors).
