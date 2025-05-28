@@ -16,7 +16,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from Model_Training.configs import experiment_config_v4_v2 as exp_config
+from Model_Training.configs import experiment_config_v4_v3 as exp_config
 from Model_Training.data_handling.data_loader import get_hf_datasets, load_data_sources_config
 from Model_Training.data_handling.collator import multitask_data_collator
 
