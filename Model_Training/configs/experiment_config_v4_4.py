@@ -13,6 +13,7 @@ from Model_Training.pipelines.stages.DistanceNormalizationStage import DistanceN
 from Model_Training.pipelines.stages.label_processor_stage import LabelProcessorStage
 from Model_Training.pipelines.stages.SNPAugmentationStage import SNPAugmentationStage  # Corrected case
 
+
 # --- Path to Load Initial Weights From (if any) ---
 # Set to None for a fresh training run for v4_4, unless you intend to fine-tune.
 LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = None
@@ -24,8 +25,8 @@ EARLY_STOPPING_THRESHOLD = 0.0005
 # --- Training Hyperparameters (Same as v4_v3) ---
 TRAINING_HYPERPARAMS = {
     "num_train_epochs": 40,
-    "per_device_train_batch_size": 64,
-    "per_device_eval_batch_size": 124,
+    "per_device_train_batch_size": 124,  # Increased batch size for better GPU utilization
+    "per_device_eval_batch_size": 256,  # Increased eval batch size for efficiency
     "learning_rate": 5e-5,
     "warmup_ratio": 0.1,
     "weight_decay": 0.01,
@@ -86,7 +87,7 @@ EXPERIMENT_NAME = "multitask_v4_4"  # New experiment name for v4_4
 MESH_FLIP_MAP = mesh_annotations_derived_flip_map
 DATA_AUGMENTATION_PARAMS = {
     # Standard geometric augmentations
-    "add_noise_prob": 0.1, "noise_std": 0.0005,
+    "add_noise_prob": 0.1, "noise_std": 0.005,
     "random_scale_prob": 0.1, "scale_range": (0.97, 1.03),
     "random_rotate_prob": 0.15, "max_rotation_angle_deg": 10.0,
     "random_flip_prob": 0.1, "landmark_flip_map": MESH_FLIP_MAP,
@@ -94,7 +95,7 @@ DATA_AUGMENTATION_PARAMS = {
     # New parameters for Temporal Displacement Jitter
     "temporal_jitter_prob": 0.2,  # Probability for each potential burst
     "jitter_burst_length_range": (2, 20),  # Burst length in FRAMES (e.g., 2 to 20 frames)
-    "jitter_magnitude_std": 0.03,  # Standard deviation for displacement magnitude
+    "jitter_magnitude_std": 0.1,  # Standard deviation for displacement magnitude
     "max_jitter_bursts_per_sequence": 3,  # Apply up to 3 jitter bursts per video sequence
 
     "verbose": False  # Set to True to debug augmentation effects

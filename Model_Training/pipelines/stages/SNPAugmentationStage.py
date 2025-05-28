@@ -121,8 +121,5 @@ class SNPAugmentationStage(BaseStage):
                                                                    device=original_reg_device)
 
                     y_processed = y_updated  # Update the return variable
-                    #printing resulting x and y after SNP augmentation
-                    print(f"{x_processed}")
-                    print(f"{y_processed}")
 
         return x_processed, y_processed
