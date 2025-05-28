@@ -11,13 +11,24 @@ class DataAugmentationStage(BaseStage):
     """
     Applies various augmentations to landmark data.
     Assumes input tensor is of shape (num_frames, num_landmarks, num_coordinates).
-    Augmentations are applied frame-wise.
+    Augmentations are applied frame-wise or over short temporal bursts.
     """
 
-    def __init__(self, add_noise_prob: float = 0.0, noise_std: float = 0.01, random_scale_prob: float = 0.0,
-                 scale_range: Tuple[float, float] = (0.9, 1.1), random_rotate_prob: float = 0.0,
-                 max_rotation_angle_deg: float = 15.0, random_flip_prob: float = 0.0,
-                 landmark_flip_map: Optional[Dict[int, int]] = None, verbose: bool = False, **kwargs):
+    def __init__(self,
+                 add_noise_prob: float = 0.0,
+                 noise_std: float = 0.01,
+                 random_scale_prob: float = 0.0,
+                 scale_range: Tuple[float, float] = (0.9, 1.1),
+                 random_rotate_prob: float = 0.0,
+                 max_rotation_angle_deg: float = 15.0,
+                 random_flip_prob: float = 0.0,
+                 landmark_flip_map: Optional[Dict[int, int]] = None,
+                 temporal_jitter_prob: float = 0.0,
+                 jitter_burst_length_range: Tuple[int, int] = (2, 5),  # Default, can be overridden by config
+                 jitter_magnitude_std: float = 0.03,
+                 max_jitter_bursts_per_sequence: int = 1,  # New parameter
+                 verbose: bool = False,
+                 **kwargs):
         """
         Initializes the data augmentation stage.
 
@@ -26,13 +37,18 @@ class DataAugmentationStage(BaseStage):
             noise_std (float): Standard deviation of the Gaussian noise.
             random_scale_prob (float): Probability of applying random scaling.
             scale_range (Tuple[float, float]): Min and max scale factor.
-            random_rotate_prob (float): Probability of applying random 2D rotation (around Z-axis).
+            random_rotate_prob (float): Probability of applying random 2D rotation.
             max_rotation_angle_deg (float): Maximum rotation angle in degrees.
             random_flip_prob (float): Probability of applying horizontal flip.
-            landmark_flip_map (Optional[Dict[int, int]]): A dictionary mapping a landmark index
-                to its horizontally flipped counterpart. Required if random_flip_prob > 0.
-                The map should contain entries for all landmarks that change position during a flip.
-                Symmetric landmarks (e.g., on the nose bridge midline) might map to themselves or be omitted.
+            landmark_flip_map (Optional[Dict[int, int]]): Mapping for horizontal flip.
+            temporal_jitter_prob (float): Probability of applying a single temporal
+                                          displacement jitter burst. This check is done for
+                                          each potential burst up to max_jitter_bursts_per_sequence.
+            jitter_burst_length_range (Tuple[int, int]): Range (min_frames, max_frames) for
+                                                         the duration of a jitter burst.
+            jitter_magnitude_std (float): Standard deviation for the random displacement vector.
+            max_jitter_bursts_per_sequence (int): Maximum number of jitter bursts that can be
+                                                  applied to a single sequence.
             verbose (bool): If True, prints processing messages.
         """
         super().__init__(verbose, **kwargs)
@@ -44,6 +60,18 @@ class DataAugmentationStage(BaseStage):
         self.max_rotation_angle_rad = math.radians(max_rotation_angle_deg)
         self.random_flip_prob = random_flip_prob
         self.landmark_flip_map = landmark_flip_map
+
+        self.temporal_jitter_prob = temporal_jitter_prob
+        if not (isinstance(jitter_burst_length_range, tuple) and len(jitter_burst_length_range) == 2 and
+                jitter_burst_length_range[0] <= jitter_burst_length_range[1] and jitter_burst_length_range[0] > 0):
+            raise ValueError(
+                "jitter_burst_length_range must be a tuple (min_frames, max_frames) with min_frames > 0 and min_frames <= max_frames.")
+        self.jitter_burst_length_range = jitter_burst_length_range
+        self.jitter_magnitude_std = jitter_magnitude_std
+        if not (isinstance(max_jitter_bursts_per_sequence, int) and max_jitter_bursts_per_sequence >= 0):
+            raise ValueError("max_jitter_bursts_per_sequence must be a non-negative integer.")
+        self.max_jitter_bursts_per_sequence = max_jitter_bursts_per_sequence
+
         self.verbose_stage = verbose
 
         if self.random_flip_prob > 0 and self.landmark_flip_map is None:
@@ -52,95 +80,102 @@ class DataAugmentationStage(BaseStage):
     def process(self, x: torch.Tensor, y: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Applies augmentations to the landmark tensor.
-
-        Args:
-            x (torch.Tensor): Input landmark tensor of shape (num_frames, num_landmarks, num_coordinates).
-            y (Dict[str, torch.Tensor]): Dictionary of labels (not used in this stage).
-        Returns:
-            Tuple[torch.Tensor, Dict[str, torch.Tensor]]: Augmented landmark tensor and unchanged label dictionary.
         """
-        if not isinstance(x, torch.Tensor):
+        if not isinstance(x, torch.Tensor) or x.ndim != 3:
+            if self.verbose_stage: print(f"{self.__class__.__name__}: Input x is not a valid 3D tensor. Skipping.")
             return x, y
-        if x.ndim != 3 or x.shape[2] < 2:  # Need at least X, Y
+
+        if x.shape[0] == 0:
+            if self.verbose_stage: print(f"{self.__class__.__name__}: Input x has 0 frames. Skipping.")
             return x, y
 
+        num_total_frames, num_landmarks, num_coords = x.shape
+        x_augmented = x.clone()
 
-        augmented_frames = []
-        num_landmarks = x.shape[1]
+        # --- Temporal Displacement Jitter ---
+        # Apply up to max_jitter_bursts_per_sequence, each with its own probability check
+        jitter_bursts_applied_count = 0
+        for _ in range(self.max_jitter_bursts_per_sequence):
+            if random.random() < self.temporal_jitter_prob and num_total_frames >= self.jitter_burst_length_range[0]:
+                # Determine burst length for this specific burst
+                # Ensure burst_len does not exceed total frames
+                max_possible_burst_len = min(self.jitter_burst_length_range[1], num_total_frames)
+                if self.jitter_burst_length_range[0] > max_possible_burst_len:  # Min requested > max possible
+                    if self.verbose_stage: print(
+                        f"{self.__class__.__name__}: Skipping a temporal jitter burst, sequence too short for min_burst_length.")
+                    continue  # Skip this potential burst
 
-        for frame_idx in range(x.shape[0]):
-            current_landmarks = x[frame_idx, :, :].clone()  # Shape (N, C)
+                burst_len = random.randint(self.jitter_burst_length_range[0], max_possible_burst_len)
 
-            # --- Horizontal Flip ---
+                # Determine start frame for this burst
+                # Ensure the burst fits: start_frame_idx can go from 0 to num_total_frames - burst_len
+                if num_total_frames - burst_len < 0:  # Should be caught by above check, but as safeguard
+                    if self.verbose_stage: print(
+                        f"{self.__class__.__name__}: Skipping a temporal jitter burst, sequence too short for chosen burst_len {burst_len}.")
+                    continue
+
+                start_frame_idx = random.randint(0, num_total_frames - burst_len)
+
+                if self.verbose_stage:
+                    print(
+                        f"{self.__class__.__name__}: Applying temporal jitter burst #{jitter_bursts_applied_count + 1} for {burst_len} frames starting at {start_frame_idx}.")
+
+                for i in range(burst_len):
+                    frame_to_jitter_idx = start_frame_idx + i
+                    displacement_vector = torch.randn(num_coords, device=x_augmented.device) * self.jitter_magnitude_std
+                    x_augmented[frame_to_jitter_idx, :, :] += displacement_vector.unsqueeze(0)
+
+                jitter_bursts_applied_count += 1
+            elif num_total_frames < self.jitter_burst_length_range[
+                0] and random.random() < self.temporal_jitter_prob:  # Log if prob passed but too short
+                if self.verbose_stage: print(
+                    f"{self.__class__.__name__}: Wanted to apply temporal jitter, but sequence length ({num_total_frames}) is less than min burst length ({self.jitter_burst_length_range[0]}).")
+
+        # --- Frame-wise Augmentations (applied after potential temporal jitter) ---
+        # These are applied to the `x_augmented` tensor which might have been modified by jitter.
+        processed_frames_for_static_augs = []
+        for frame_idx in range(x_augmented.shape[0]):
+            current_landmarks = x_augmented[frame_idx, :, :].clone()
+
             if random.random() < self.random_flip_prob and self.landmark_flip_map:
                 flipped_landmarks = current_landmarks.clone()
-                # Negate X coordinates (assuming X is the horizontal axis, index 0)
                 flipped_landmarks[:, 0] = -flipped_landmarks[:, 0]
-
-                # Create a temporary tensor to hold the re-ordered landmarks
                 temp_landmarks = flipped_landmarks.clone()
                 for i in range(num_landmarks):
-                    # If landmark i has a mapping, place the flipped data of its counterpart into position i
-                    # If landmark i is its own counterpart (e.g. midline), its data is already flipped (X negated)
-                    # If landmark i is not in map (e.g. midline and not explicitly mapped to itself), it keeps its X-negated data
                     target_idx = self.landmark_flip_map.get(i)
-                    if target_idx is not None and target_idx != i:  # if i maps to a different landmark
+                    if target_idx is not None and target_idx != i:
                         temp_landmarks[i, :] = flipped_landmarks[target_idx, :]
-                    # If i maps to itself (explicitly in map) or not in map at all,
-                    # flipped_landmarks[i,:] (with X negated) is already correct for temp_landmarks[i,:]
                 current_landmarks = temp_landmarks
 
-            # Calculate centroid for scale and rotation (using X, Y coordinates: indices 0, 1)
-            # This is important if data isn't already centered (e.g. if DistanceNormalizationStage wasn't used)
-            # or if previous augmentations shifted the centroid.
-            centroid = torch.mean(current_landmarks[:, :2], dim=0)  # Shape (2,) for (x_mean, y_mean)
+            centroid = torch.mean(current_landmarks[:, :min(2, num_coords)], dim=0)
 
-            # --- Random Rotation (2D in-plane around Z-axis) ---
-            if random.random() < self.random_rotate_prob:
+            if random.random() < self.random_rotate_prob and num_coords >= 2:
                 angle = random.uniform(-self.max_rotation_angle_rad, self.max_rotation_angle_rad)
                 cos_a, sin_a = math.cos(angle), math.sin(angle)
-
-                # Rotation matrix for 2D (XY plane)
-                # R = [[cos_a, -sin_a],
-                #      [sin_a,  cos_a]]
-
-                # Center XY coordinates around centroid
-                xy_coords = current_landmarks[:, :2] - centroid.unsqueeze(0)  # (N, 2)
-
-                # Apply rotation
+                xy_coords = current_landmarks[:, :2] - centroid.unsqueeze(0)
                 x_rot = xy_coords[:, 0] * cos_a - xy_coords[:, 1] * sin_a
                 y_rot = xy_coords[:, 0] * sin_a + xy_coords[:, 1] * cos_a
-
-                # Update XY coordinates and shift back
                 current_landmarks[:, 0] = x_rot + centroid[0]
                 current_landmarks[:, 1] = y_rot + centroid[1]
-                # Z coordinate (if present, index 2) remains unchanged by 2D rotation
 
-            # --- Random Scaling ---
             if random.random() < self.random_scale_prob:
                 scale_factor = random.uniform(self.scale_range[0], self.scale_range[1])
-
-                # Center all coordinates around their respective means for scaling
-                # For X, Y, use the previously calculated centroid
-                # For Z (if present), calculate its mean separately
                 scaled_coords = current_landmarks.clone()
-                scaled_coords[:, :2] = (current_landmarks[:, :2] - centroid.unsqueeze(
-                    0)) * scale_factor + centroid.unsqueeze(0)
-                if current_landmarks.shape[1] > 2:  # If Z coordinate exists
+                if num_coords >= 2:
+                    scaled_coords[:, :2] = (current_landmarks[:, :2] - centroid.unsqueeze(
+                        0)) * scale_factor + centroid.unsqueeze(0)
+                if num_coords > 2:
                     z_centroid = torch.mean(current_landmarks[:, 2])
                     scaled_coords[:, 2] = (current_landmarks[:, 2] - z_centroid) * scale_factor + z_centroid
                 current_landmarks = scaled_coords
 
-            # --- Add Noise ---
             if random.random() < self.add_noise_prob:
                 noise = torch.randn_like(current_landmarks) * self.noise_std
                 current_landmarks += noise
 
-            augmented_frames.append(current_landmarks)
+            processed_frames_for_static_augs.append(current_landmarks)
 
-        if not augmented_frames:
-            return x, y
+        if processed_frames_for_static_augs:
+            x_augmented = torch.stack(processed_frames_for_static_augs, dim=0)
 
-        output_tensor = torch.stack(augmented_frames, dim=0)
-
-        return output_tensor, y
+        return x_augmented, y
