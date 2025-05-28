@@ -41,7 +41,7 @@ TRAINING_HYPERPARAMS = {
     "metric_for_best_model": "eval_mae",
     "greater_is_better": False,
     "fp16": True,
-    "dataloader_num_workers": 4, # Set to 0 if not using CUDA or for debugging
+    "dataloader_num_workers": 0, # Set to 0 if not using CUDA or for debugging
     "dataloader_pin_memory": True,
     "report_to": "tensorboard",
 }
@@ -125,7 +125,7 @@ snp_augmentation_stage_instance = SNPAugmentationStage(**SNP_AUGMENTATION_PARAMS
 TRAIN_PIPELINE = OrchestrationPipeline(stages=[
     label_processor_stage_instance,
     distance_normalization_stage_instance,
-    # data_augmentation_stage_instance, # Geometric augmentations
+    data_augmentation_stage_instance, # Geometric augmentations
     snp_augmentation_stage_instance   # SNP augmentation
 ])
 
