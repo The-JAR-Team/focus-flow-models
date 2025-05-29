@@ -71,13 +71,20 @@ MODEL_PARAMS = {
     "regression_output_dim": 1,
     "num_classes": NUM_CLASSES_CLASSIFICATION,
     "regression_loss_weight": 1.0,
-    "classification_loss_weight": 0.5,
+    "classification_loss_weight": 0.5, # This weight is for the overall classification task
 }
 NUM_COORDINATES = 3
 
 # --- Loss Functions ---
 REGRESSION_LOSS_FN = nn.MSELoss()
-CLASSIFICATION_LOSS_FN = nn.CrossEntropyLoss()
+
+# Define weights for each class to influence precision/recall for classification
+# Order: Not Engaged, Barely Engaged, Engaged, Highly Engaged, SNP
+# Higher weight means model is penalized more for misclassifying that true class (aims to reduce False Negatives for that class)
+CLASSIFICATION_CLASS_WEIGHTS = torch.tensor([0.8, 1.0, 1.5, 2.0, 0.5], dtype=torch.float32)
+# The trainer will move this tensor to the correct device.
+CLASSIFICATION_LOSS_FN = nn.CrossEntropyLoss(weight=CLASSIFICATION_CLASS_WEIGHTS)
+
 
 # --- Paths and Naming ---
 BASE_OUTPUT_DIR = "./training_runs_output/"
@@ -106,8 +113,8 @@ SNP_CLASS_IDX = LABEL_TO_IDX_MAP['SNP']
 SNP_REG_SCORE = IDX_TO_SCORE_MAP[SNP_CLASS_IDX]
 
 SNP_AUGMENTATION_PARAMS = {
-    "snp_conversion_prob": 0.05,
-    "min_snp_frame_percentage": 0.4, # Increased to 40%
+    "snp_conversion_prob": 0.03, # Changed to 3%
+    "min_snp_frame_percentage": 0.4, # Increased to 60%
     "snp_class_idx": SNP_CLASS_IDX,
     "snp_reg_score": SNP_REG_SCORE,
     "verbose": False
@@ -194,6 +201,7 @@ if __name__ == '__main__':
     print(
         f"Training for {TRAINING_HYPERPARAMS['num_train_epochs']} epochs with LR: {TRAINING_HYPERPARAMS['learning_rate']}.")
     print(f"RESUME_FROM_CHECKPOINT is set to: {RESUME_FROM_CHECKPOINT}")
+    print(f"Classification loss will use weights: {CLASSIFICATION_CLASS_WEIGHTS.tolist()}")
     print(f"Data Augmentation includes AGGRESSIVE Temporal Jitter and Geometric Augmentations:")
     print(f"  Noise Prob: {DATA_AUGMENTATION_PARAMS['add_noise_prob']*100}%, Noise Std: {DATA_AUGMENTATION_PARAMS['noise_std']}")
     print(f"  Scale Prob: {DATA_AUGMENTATION_PARAMS['random_scale_prob']*100}%, Scale Range: {DATA_AUGMENTATION_PARAMS['scale_range']}")
