@@ -25,8 +25,8 @@ EARLY_STOPPING_THRESHOLD = 0.0005
 # --- Training Hyperparameters (Same as v4_v3) ---
 TRAINING_HYPERPARAMS = {
     "num_train_epochs": 40,
-    "per_device_train_batch_size": 124,  # Increased batch size for better GPU utilization
-    "per_device_eval_batch_size": 256,  # Increased eval batch size for efficiency
+    "per_device_train_batch_size": 64,  # Increased batch size for better GPU utilization
+    "per_device_eval_batch_size": 128,  # Increased eval batch size for efficiency
     "learning_rate": 5e-5,
     "warmup_ratio": 0.1,
     "weight_decay": 0.01,
@@ -93,7 +93,7 @@ DATA_AUGMENTATION_PARAMS = {
     "random_flip_prob": 0.1, "landmark_flip_map": MESH_FLIP_MAP,
 
     # New parameters for Temporal Displacement Jitter
-    "temporal_jitter_prob": 0.2,  # Probability for each potential burst
+    "temporal_jitter_prob": 0.1,  # Probability for each potential burst
     "jitter_burst_length_range": (2, 20),  # Burst length in FRAMES (e.g., 2 to 20 frames)
     "jitter_magnitude_std": 0.1,  # Standard deviation for displacement magnitude
     "max_jitter_bursts_per_sequence": 3,  # Apply up to 3 jitter bursts per video sequence
