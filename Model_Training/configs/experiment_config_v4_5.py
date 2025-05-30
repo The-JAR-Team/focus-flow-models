@@ -24,7 +24,7 @@ EARLY_STOPPING_THRESHOLD = 0.0005 # Kept from v4_4
 
 # --- Training Hyperparameters (Same as v4_4) ---
 TRAINING_HYPERPARAMS = {
-    "num_train_epochs": 40,
+    "num_train_epochs": 5,
     "per_device_train_batch_size": 64,
     "per_device_eval_batch_size": 128,
     "learning_rate": 5e-5,
@@ -39,7 +39,7 @@ TRAINING_HYPERPARAMS = {
     "metric_for_best_model": "eval_mae",
     "greater_is_better": False,
     "fp16": True,
-    "dataloader_num_workers": 0,
+    "dataloader_num_workers": 4,
     "dataloader_pin_memory": True,
     "report_to": "tensorboard",
 }
