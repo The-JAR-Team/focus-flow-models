@@ -1,11 +1,10 @@
-# engagement_hf_trainer/configs/experiment_config_v4_5.py
+# engagement_hf_trainer/configs/experiment_config_v4_5_improved.py
 from typing import Optional, Dict, Union
 
 import torch
 import torch.nn as nn
 
 from Model_Training.configs.mesh_flipmap import mesh_annotations_derived_flip_map
-# Assuming multitask_gru_attention_model_v4_2 is the intended model file
 from Model_Training.models.multitask_gru_attention_model_v4_2 import EngagementMultiTaskGRUAttentionModel
 from Model_Training.pipelines.pipeline import OrchestrationPipeline
 from Model_Training.pipelines.stages.DataAugmentationStage import DataAugmentationStage
@@ -15,21 +14,20 @@ from Model_Training.pipelines.stages.SNPAugmentationStage import SNPAugmentation
 
 
 # --- Path to Load Initial Weights From (if any) ---
-# Set to None for a fresh training run for v4_5.
 LOAD_INITIAL_WEIGHTS_PATH: Optional[str] = None
 
 # --- Early Stopping Parameters ---
-EARLY_STOPPING_PATIENCE = 30 # Kept from v4_4
-EARLY_STOPPING_THRESHOLD = 0.0005 # Kept from v4_4
+EARLY_STOPPING_PATIENCE = 20  # Reduced from 30 to stop earlier when overfitting
+EARLY_STOPPING_THRESHOLD = 0.001  # Increased from 0.0005 for earlier stopping
 
-# --- Training Hyperparameters (Same as v4_4) ---
+# --- Training Hyperparameters (Modified for better generalization) ---
 TRAINING_HYPERPARAMS = {
-    "num_train_epochs": 5,
+    "num_train_epochs": 40,
     "per_device_train_batch_size": 64,
     "per_device_eval_batch_size": 128,
-    "learning_rate": 5e-5,
-    "warmup_ratio": 0.1,
-    "weight_decay": 0.01,
+    "learning_rate": 3e-5,  # Reduced from 5e-5
+    "warmup_ratio": 0.15,  # Increased from 0.1 for smoother start
+    "weight_decay": 0.02,  # Increased from 0.01 for better regularization
     "logging_strategy": "steps",
     "logging_steps": 50,
     "eval_strategy": "epoch",
@@ -39,9 +37,11 @@ TRAINING_HYPERPARAMS = {
     "metric_for_best_model": "eval_mae",
     "greater_is_better": False,
     "fp16": True,
-    "dataloader_num_workers": 4,
+    "dataloader_num_workers": 8,
     "dataloader_pin_memory": True,
     "report_to": "tensorboard",
+    # Add gradient clipping to prevent instability
+    "max_grad_norm": 1.0,
 }
 
 # --- Label Mappings (Consistent) ---
@@ -61,60 +61,65 @@ IDX_TO_NAME_MAP: Dict[int, str] = {
 NUM_CLASSES_CLASSIFICATION = 5
 ENGAGEMENT_KEY_IN_RAW_LABEL = 'engagement_string'
 
-# --- Model Configuration (Same class) ---
+# --- Model Configuration (Reduced complexity to prevent overfitting) ---
 MODEL_CLASS = EngagementMultiTaskGRUAttentionModel
 MODEL_PARAMS = {
     "hidden_dim": 256,
     "num_gru_layers": 2,
-    "dropout_rate": 0.4, # Consider if this needs adjustment with heavy aug
+    "dropout_rate": 0.25,  # Reduced from 0.4 - heavy augmentation acts as regularization
     "bidirectional_gru": True,
     "regression_output_dim": 1,
     "num_classes": NUM_CLASSES_CLASSIFICATION,
     "regression_loss_weight": 1.0,
-    "classification_loss_weight": 0.5, # This weight is for the overall classification task
+    "classification_loss_weight": 0.5,
 }
 NUM_COORDINATES = 3
 
 # --- Loss Functions ---
 REGRESSION_LOSS_FN = nn.MSELoss()
 
-# Define weights for each class to influence precision/recall for classification
-# Order: Not Engaged, Barely Engaged, Engaged, Highly Engaged, SNP
-# Higher weight means model is penalized more for misclassifying that true class (aims to reduce False Negatives for that class)
-CLASSIFICATION_CLASS_WEIGHTS = torch.tensor([0.8, 1.0, 1.5, 2.0, 0.5], dtype=torch.float32)
-# The trainer will move this tensor to the correct device.
+# Adjusted class weights - less extreme differences
+CLASSIFICATION_CLASS_WEIGHTS = torch.tensor([1.0, 1.2, 1.5, 1.8, 0.8], dtype=torch.float32)
 CLASSIFICATION_LOSS_FN = nn.CrossEntropyLoss(weight=CLASSIFICATION_CLASS_WEIGHTS)
-
 
 # --- Paths and Naming ---
 BASE_OUTPUT_DIR = "./training_runs_output/"
-EXPERIMENT_NAME = "multitask_v4_5"  # New experiment name for v4_5
+EXPERIMENT_NAME = "multitask_v4_5_improved"
 
-# --- Data Augmentation Parameters (Aggressively Increased Probabilities and Magnitudes) ---
+# --- Data Augmentation Parameters (Moderate augmentation strategy) ---
 MESH_FLIP_MAP = mesh_annotations_derived_flip_map
-DATA_AUGMENTATION_PARAMS = {
-    # Standard geometric augmentations - More Aggressive
-    "add_noise_prob": 0.8, "noise_std": 0.008,
-    "random_scale_prob": 0.8, "scale_range": (0.90, 1.10),
-    "random_rotate_prob": 0.8, "max_rotation_angle_deg": 20.0,
-    "random_flip_prob": 0.7, "landmark_flip_map": MESH_FLIP_MAP,
 
-    # Temporal Displacement Jitter - More Aggressive
-    "temporal_jitter_prob": 0.8,
-    "jitter_burst_length_range": (5, 25),
-    "jitter_magnitude_std": 0.15,
-    "max_jitter_bursts_per_sequence": 4,
+# Progressive augmentation strategy
+DATA_AUGMENTATION_PARAMS = {
+    # Geometric augmentations - moderate probabilities
+    "add_noise_prob": 0.5,  # Reduced from 0.8
+    "noise_std": 0.004,  # Reduced from 0.008
+    
+    "random_scale_prob": 0.4,  # Reduced from 0.8
+    "scale_range": (0.95, 1.05),  # Reduced from (0.90, 1.10)
+    
+    "random_rotate_prob": 0.4,  # Reduced from 0.8
+    "max_rotation_angle_deg": 10.0,  # Reduced from 20.0
+    
+    "random_flip_prob": 0.3,  # Reduced from 0.7
+    "landmark_flip_map": MESH_FLIP_MAP,
+
+    # Temporal Displacement Jitter - significantly reduced
+    "temporal_jitter_prob": 0.3,  # Reduced from 0.8
+    "jitter_burst_length_range": (3, 10),  # Reduced from (5, 25)
+    "jitter_magnitude_std": 0.05,  # Reduced from 0.15
+    "max_jitter_bursts_per_sequence": 2,  # Reduced from 4
 
     "verbose": False
 }
 
-# --- SNP Augmentation Parameters (Aggressively Increased Probability) ---
+# --- SNP Augmentation Parameters (Reduced) ---
 SNP_CLASS_IDX = LABEL_TO_IDX_MAP['SNP']
 SNP_REG_SCORE = IDX_TO_SCORE_MAP[SNP_CLASS_IDX]
 
 SNP_AUGMENTATION_PARAMS = {
-    "snp_conversion_prob": 0.03, # Changed to 3%
-    "min_snp_frame_percentage": 0.4, # Increased to 60%
+    "snp_conversion_prob": 0.015,  # Reduced from 0.03
+    "min_snp_frame_percentage": 0.4,
     "snp_class_idx": SNP_CLASS_IDX,
     "snp_reg_score": SNP_REG_SCORE,
     "verbose": False
@@ -133,7 +138,7 @@ distance_normalization_stage_instance = DistanceNormalizationStage(
 data_augmentation_stage_instance = DataAugmentationStage(**DATA_AUGMENTATION_PARAMS)
 snp_augmentation_stage_instance = SNPAugmentationStage(**SNP_AUGMENTATION_PARAMS)
 
-# --- Pipeline Definitions (Same structure as v4_4) ---
+# --- Pipeline Definitions ---
 TRAIN_PIPELINE = OrchestrationPipeline(stages=[
     label_processor_stage_instance,
     distance_normalization_stage_instance,
@@ -144,7 +149,7 @@ TRAIN_PIPELINE = OrchestrationPipeline(stages=[
 VALIDATION_PIPELINE = OrchestrationPipeline(stages=[
     label_processor_stage_instance,
     distance_normalization_stage_instance,
-    snp_augmentation_stage_instance
+    # Removed SNP augmentation from validation for cleaner evaluation
 ])
 
 TEST_PIPELINE = OrchestrationPipeline(stages=[
@@ -198,19 +203,22 @@ if __name__ == '__main__':
         print(f"Attempting to load initial weights from: {LOAD_INITIAL_WEIGHTS_PATH}")
     else:
         print("Starting training from scratch (no initial weights path specified).")
-    print(
-        f"Training for {TRAINING_HYPERPARAMS['num_train_epochs']} epochs with LR: {TRAINING_HYPERPARAMS['learning_rate']}.")
+    print(f"Training for {TRAINING_HYPERPARAMS['num_train_epochs']} epochs with LR: {TRAINING_HYPERPARAMS['learning_rate']}.")
     print(f"RESUME_FROM_CHECKPOINT is set to: {RESUME_FROM_CHECKPOINT}")
     print(f"Classification loss will use weights: {CLASSIFICATION_CLASS_WEIGHTS.tolist()}")
-    print(f"Data Augmentation includes AGGRESSIVE Temporal Jitter and Geometric Augmentations:")
+    print(f"\nData Augmentation Strategy: MODERATE")
     print(f"  Noise Prob: {DATA_AUGMENTATION_PARAMS['add_noise_prob']*100}%, Noise Std: {DATA_AUGMENTATION_PARAMS['noise_std']}")
     print(f"  Scale Prob: {DATA_AUGMENTATION_PARAMS['random_scale_prob']*100}%, Scale Range: {DATA_AUGMENTATION_PARAMS['scale_range']}")
     print(f"  Rotate Prob: {DATA_AUGMENTATION_PARAMS['random_rotate_prob']*100}%, Max Angle: {DATA_AUGMENTATION_PARAMS['max_rotation_angle_deg']}")
     print(f"  Flip Prob: {DATA_AUGMENTATION_PARAMS['random_flip_prob']*100}%")
-    print(f"  Temporal Jitter Probability (per burst): {DATA_AUGMENTATION_PARAMS['temporal_jitter_prob'] * 100}%")
-    print(f"  Jitter Burst Length (frames): {DATA_AUGMENTATION_PARAMS['jitter_burst_length_range']}")
+    print(f"  Temporal Jitter Probability: {DATA_AUGMENTATION_PARAMS['temporal_jitter_prob'] * 100}%")
+    print(f"  Jitter Burst Length: {DATA_AUGMENTATION_PARAMS['jitter_burst_length_range']}")
     print(f"  Jitter Magnitude STD: {DATA_AUGMENTATION_PARAMS['jitter_magnitude_std']}")
-    print(f"  Max Jitter Bursts per Sequence: {DATA_AUGMENTATION_PARAMS['max_jitter_bursts_per_sequence']}")
-    print(f"SNP Augmentation will be applied to TRAIN and VALIDATION sets with AGGRESSIVE probability:")
+    print(f"  Max Jitter Bursts: {DATA_AUGMENTATION_PARAMS['max_jitter_bursts_per_sequence']}")
+    print(f"\nSNP Augmentation (Training only):")
     print(f"  SNP Conversion Probability: {SNP_AUGMENTATION_PARAMS['snp_conversion_prob'] * 100}%")
     print(f"  Min SNP Frame Percentage: {SNP_AUGMENTATION_PARAMS['min_snp_frame_percentage']*100}%")
+    print(f"\nRegularization:")
+    print(f"  Dropout Rate: {MODEL_PARAMS['dropout_rate']}")
+    print(f"  Weight Decay: {TRAINING_HYPERPARAMS['weight_decay']}")
+    print(f"  Gradient Clipping: {TRAINING_HYPERPARAMS.get('max_grad_norm', 'Not set')}")
