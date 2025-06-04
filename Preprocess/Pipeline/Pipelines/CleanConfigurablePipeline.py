@@ -294,7 +294,7 @@ if __name__ == "__main__":
     # No multiprocessing setup needed
 
     # Define config path
-    config_file_path = "./configs/ENGAGENET_10fps_quality95_randdist.json" # Adjust path as needed
+    config_file_path = "./configs/ENGAGENET_10fps_facecloseup_config.json" # Adjust path as needed
 
     train_dl, val_dl, test_dl = run_sequential_pipeline(config_file_path)
 

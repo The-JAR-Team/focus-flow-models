@@ -18,7 +18,7 @@ from Preprocess.Pipeline.InspectData import inspect, get_dataloader
 INSPECT_BATCH_SIZE = 32
 
 # Path to the pipeline configuration JSON file (relative to this run.py script)
-CONFIG_FILE_PATH = f"./Preprocess/Pipeline/Pipelines/configs/ENGAGENET_10fps_quality95_randdist_80_20.json"
+CONFIG_FILE_PATH = f"./Preprocess/Pipeline/Pipelines/configs/ENGAGENET_10fps_facecloseup_config.json"
 
 # Parameters specific to the threaded execution mode
 THREADED_MAX_WORKERS = 4  # Let the pipeline choose default (e.g., os.cpu_count() * 2), or set manually (e.g., 8, 16)

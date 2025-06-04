@@ -19,7 +19,7 @@
       <excludeFolder url="file://$MODULE_DIR$/Model_Training/training_runs_output/engagement_multitask_v4/trainer_artifacts/runs/May19_05-50-01_JonPc" />
       <excludeFolder url="file://$MODULE_DIR$/.venv1" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.12 (models) (2)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.12 (focus-flow-models)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>
